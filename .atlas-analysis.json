@@ -1,0 +1,75 @@
+{
+  "projectType": "frontend",
+  "projectName": "Production Inspection Form",
+  "projectDescription": "Next.js-based technical inspection form system for production equipment monitoring and quality control.",
+  "theme": "linden",
+  "primaryColor": "#003399",
+  "lightColor": "#FFD200",
+  "darkColor": "#001a4d",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "introduction",
+              "features"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/installation",
+              "getting-started/deployment",
+              "getting-started/configuration"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "user-guide/authentication",
+              "user-guide/inspection-form",
+              "user-guide/equipment-selection",
+              "user-guide/submitting-inspections"
+            ]
+          },
+          {
+            "group": "Technical Reference",
+            "pages": [
+              "technical/architecture",
+              "technical/api-integration",
+              "technical/data-model",
+              "technical/state-management"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "support/faq",
+              "support/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "User authentication and session management",
+    "Dynamic inspection form with equipment selection",
+    "Real-time data fetching from backend API",
+    "Technical inspection checklist with OK/NOK/NA options",
+    "Equipment categorization by division, area, and zone",
+    "Form validation and submission tracking",
+    "Responsive Next.js interface"
+  ],
+  "publicApiSurface": [
+    "Login page (/login)",
+    "Main inspection form (/)",
+    "Equipment selection interface",
+    "Dynamic technical questions based on equipment category",
+    "Form submission with observation notes",
+    "User session management"
+  ]
+}
