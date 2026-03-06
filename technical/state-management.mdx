@@ -1,0 +1,602 @@
+---
+title: 'State Management'
+description: 'React state management patterns and localStorage usage in the inspection form'
+---
+
+## State Management Architecture
+
+The Production Inspection Form uses **React Hooks** for state management, specifically `useState` for component state and `useEffect` for side effects and data loading.
+
+<Info>
+The application does not use external state management libraries (Redux, Zustand, etc.). All state is managed locally within components using React hooks.
+</Info>
+
+## Component State Organization
+
+### Main Form Component State
+
+The inspection form component manages 14 separate pieces of state:
+
+```javascript
+function InspectionForm() {
+  // 1. Mounting state - ensures client-side only rendering
+  const [mounted, setMounted] = useState(false);
+  
+  // 2. API URL configuration
+  const [apiUrl, setApiUrl] = useState(null);
+  
+  // 3. Form data - main data structure
+  const [formData, setFormData] = useState({
+    fecha: "",
+    horaInicio: "",
+    horaFin: "",
+    division: "",
+    area: "",
+    zona: "",
+    equipo: "",
+    observaciones: "",
+    tecnicos: {}
+  });
+  
+  // 4. Current user
+  const [usuario, setUsuario] = useState("");
+  
+  // 5-8. Catalog data (dropdowns)
+  const [divisiones, setDivisiones] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [zonas, setZonas] = useState([]);
+  const [equipos, setEquipos] = useState([]);
+  
+  // 9. Equipment category
+  const [categoria, setCategoria] = useState("");
+  
+  // 10. Physical location
+  const [ubicacion, setUbicacion] = useState("");
+  
+  // 11. Inspection questions
+  const [preguntas, setPreguntas] = useState([]);
+  
+  // 12. Status/feedback messages
+  const [statusMessage, setStatusMessage] = useState("");
+  
+  // ...
+}
+```
+
+### Login Component State
+
+```javascript
+function LoginPage() {
+  const router = useRouter();
+  
+  // Form fields
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  
+  // Error feedback
+  const [errorMessage, setErrorMessage] = useState("");
+  
+  // ...
+}
+```
+
+## State Update Patterns
+
+### Immutable Updates with Functional setState
+
+The application uses functional state updates to ensure immutability:
+
+```javascript
+// Setting nested object properties
+setFormData(prev => ({
+  ...prev,
+  fecha: now.toISOString().split("T")[0],
+  horaInicio: timeString
+}));
+
+// Updating nested tecnicos object
+setFormData(prev => ({
+  ...prev,
+  tecnicos: {
+    ...prev.tecnicos,
+    [pregunta]: valor
+  }
+}));
+```
+
+<Note>
+Functional setState (`prev => ({ ...prev, ... })`) is used throughout to ensure updates are based on the latest state, preventing race conditions.
+</Note>
+
+### Direct Updates for Simple State
+
+```javascript
+// Simple string state
+setUsuario(nombreUsuario || usuario);
+setCategoria(equipo.categoria);
+setUbicacion(equipo.ubicacion);
+setStatusMessage("Formulario enviado correctamente");
+
+// Array state
+setDivisiones(divisionesData);
+setAreas(areasData);
+setPreguntas(preguntasData);
+```
+
+## useState Hook Patterns
+
+### Pattern 1: Simple Value State
+
+```javascript
+const [mounted, setMounted] = useState(false);
+const [apiUrl, setApiUrl] = useState(null);
+const [usuario, setUsuario] = useState("");
+const [categoria, setCategoria] = useState("");
+```
+
+### Pattern 2: Complex Object State
+
+```javascript
+const [formData, setFormData] = useState({
+  fecha: "",
+  horaInicio: "",
+  horaFin: "",
+  division: "",
+  area: "",
+  zona: "",
+  equipo: "",
+  observaciones: "",
+  tecnicos: {}
+});
+```
+
+### Pattern 3: Array State
+
+```javascript
+const [divisiones, setDivisiones] = useState([]);
+const [areas, setAreas] = useState([]);
+const [zonas, setZonas] = useState([]);
+const [preguntas, setPreguntas] = useState([]);
+```
+
+## useEffect Hook Patterns
+
+The application uses three main `useEffect` hooks with different purposes:
+
+### Effect 1: Component Mount Detection
+
+```javascript
+useEffect(() => {
+  setMounted(true);
+}, []);
+```
+
+**Purpose**: Prevents hydration mismatches by ensuring client-only code runs after mount.
+
+**Dependencies**: Empty array `[]` means this runs once on mount.
+
+### Effect 2: Authentication & Configuration
+
+```javascript
+useEffect(() => {
+  // Check authentication
+  const usuario = localStorage.getItem("usuario_inspeccion");
+  const nombreUsuario = localStorage.getItem("usuario_nombre");
+  
+  if (usuario) {
+    setUsuario(nombreUsuario || usuario);
+  } else {
+    // Redirect to login
+    const currentUrl = window.location.href;
+    localStorage.setItem("redirect_after_login", currentUrl);
+    router.push("/login");
+  }
+  
+  // Set API URL
+  setApiUrl("http://10.107.194.110/insp/");
+}, []);
+```
+
+**Purpose**: 
+- Verify user authentication on page load
+- Redirect to login if not authenticated
+- Configure API URL
+
+**Dependencies**: Empty array `[]` means this runs once on mount.
+
+<Warning>
+This effect accesses `localStorage` which is only available in the browser. This is why the `mounted` state guard is necessary.
+</Warning>
+
+### Effect 3: Data Loading
+
+```javascript
+useEffect(() => {
+  if (!apiUrl) return;
+  
+  // Initialize form date/time
+  const now = new Date();
+  const timeString = now.toTimeString().split(" ")[0];
+  
+  setFormData(prev => ({
+    ...prev,
+    fecha: now.toISOString().split("T")[0],
+    horaInicio: timeString
+  }));
+  
+  // Load all catalog data in parallel
+  Promise.all([
+    fetch(`${apiUrl}/api/divisiones/`).then(r => r.json()).catch(() => []),
+    fetch(`${apiUrl}/api/areas/`).then(r => r.json()).catch(() => []),
+    fetch(`${apiUrl}/api/zonas/`).then(r => r.json()).catch(() => []),
+    fetch(`${apiUrl}/api/equipos/`).then(r => r.json()).catch(() => [])
+  ]).then(([divs, ars, zns, eqs]) => {
+    setDivisiones(divs);
+    setAreas(ars);
+    setZonas(zns);
+    setEquipos(eqs);
+  });
+  
+  // Load equipment from URL parameter
+  const equipoId = searchParams.get("equipo");
+  setFormData(prev => ({ ...prev, equipo: equipoId || "" }));
+  
+  if (equipoId) {
+    // Load equipment details
+    fetch(`${apiUrl}/api/equipos/`)
+      .then(res => res.json())
+      .then(equipos => {
+        const equipo = equipos.find(e => String(e.id) === String(equipoId));
+        
+        if (equipo) {
+          // Populate form with equipment data
+          setFormData(prev => ({
+            ...prev,
+            division: equipo.division_id,
+            area: equipo.area_id,
+            zona: equipo.zona_id
+          }));
+          
+          setUbicacion(equipo.ubicacion);
+          setCategoria(equipo.categoria);
+          
+          // Load questions for this equipment category
+          if (equipo.categoria) {
+            fetch(`${apiUrl}/api/preguntas/${equipo.categoria}/`)
+              .then(res => res.json())
+              .then(setPreguntas)
+              .catch(err => console.error("Error cargando preguntas", err));
+          }
+        }
+      })
+      .catch(err => console.error("Error cargando equipo", err));
+  }
+}, [apiUrl]);
+```
+
+**Purpose**:
+- Initialize form with current date/time
+- Load all catalog data (divisions, areas, zones, equipment)
+- Pre-populate form if equipment ID is in URL
+- Load inspection questions based on equipment category
+
+**Dependencies**: `[apiUrl]` means this runs when `apiUrl` changes (set in effect #2).
+
+<Info>
+This creates a chain of effects: Mount → Auth/Config → Data Loading. This ensures data loading only happens after authentication is verified.
+</Info>
+
+## Form State Handlers
+
+### Handling Form Input Changes
+
+```javascript
+// Text input handler
+<input
+  type="text"
+  value={formData.observaciones}
+  onChange={(e) => setFormData({
+    ...formData,
+    observaciones: e.target.value
+  })}
+/>
+
+// Textarea handler
+<textarea
+  value={formData.observaciones}
+  onChange={(e) => setFormData({
+    ...formData,
+    observaciones: e.target.value
+  })}
+  rows={4}
+/>
+```
+
+### Handling Question Responses
+
+```javascript
+const handleTecnicoChange = (pregunta, valor) => {
+  setFormData(prev => ({
+    ...prev,
+    tecnicos: {
+      ...prev.tecnicos,
+      [pregunta]: valor
+    }
+  }));
+};
+
+// Radio button implementation
+<input
+  type="radio"
+  name={`pregunta-${pregunta.id}`}
+  value="OK"
+  checked={formData.tecnicos[pregunta.descripcion] === "OK"}
+  onChange={() => handleTecnicoChange(pregunta.descripcion, "OK")}
+/>
+
+<input
+  type="radio"
+  name={`pregunta-${pregunta.id}`}
+  value="NOK"
+  checked={formData.tecnicos[pregunta.descripcion] === "NOK"}
+  onChange={() => handleTecnicoChange(pregunta.descripcion, "NOK")}
+/>
+
+<input
+  type="radio"
+  name={`pregunta-${pregunta.id}`}
+  value="NA"
+  checked={formData.tecnicos[pregunta.descripcion] === "NA"}
+  onChange={() => handleTecnicoChange(pregunta.descripcion, "NA")}
+/>
+```
+
+## localStorage Integration
+
+The application uses browser `localStorage` for persistent user session management.
+
+### Session Storage Schema
+
+```typescript
+interface LocalStorageSchema {
+  "usuario_inspeccion": string;      // Username
+  "usuario_nombre": string;          // Full name ("First Last")
+  "redirect_after_login"?: string;   // URL to redirect after login
+}
+```
+
+### Reading from localStorage
+
+```javascript
+// Authentication check
+const usuario = localStorage.getItem("usuario_inspeccion");
+const nombreUsuario = localStorage.getItem("usuario_nombre");
+
+if (usuario) {
+  // User is authenticated
+  setUsuario(nombreUsuario || usuario);
+} else {
+  // User is not authenticated - redirect to login
+  const currentUrl = window.location.href;
+  localStorage.setItem("redirect_after_login", currentUrl);
+  router.push("/login");
+}
+```
+
+### Writing to localStorage
+
+```javascript
+// After successful login
+if (data.status === "ok") {
+  // Store user session
+  localStorage.setItem("usuario_inspeccion", username);
+  localStorage.setItem("usuario_nombre", `${data.first_name} ${data.last_name}`);
+  
+  // Get redirect URL and clean up
+  const redirectUrl = localStorage.getItem("redirect_after_login") || "/";
+  localStorage.removeItem("redirect_after_login");
+  
+  router.push(redirectUrl);
+}
+```
+
+### Removing from localStorage
+
+```javascript
+// Logout handler
+<button
+  onClick={() => {
+    localStorage.removeItem("usuario_inspeccion");
+    router.push("/login");
+  }}
+>
+  Cerrar Sesión
+</button>
+```
+
+<Warning>
+Storing authentication data in localStorage has security implications:
+- Vulnerable to XSS attacks
+- No automatic expiration
+- Accessible to all JavaScript on the page
+
+For production, consider:
+- HTTP-only cookies for session tokens
+- Server-side session management
+- Token expiration and refresh mechanisms
+</Warning>
+
+## State Reset on Form Submission
+
+```javascript
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // ... submission logic ...
+  
+  try {
+    const response = await fetch(`${apiUrl}/api/guardar/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(submissionData)
+    });
+    
+    const result = await response.json();
+    setStatusMessage(result.message || "Formulario enviado correctamente");
+    
+    // Reset form to initial state
+    setFormData({
+      fecha: "",
+      horaInicio: "",
+      horaFin: "",
+      division: "",
+      area: "",
+      zona: "",
+      equipo: "",
+      observaciones: "",
+      tecnicos: {}
+    });
+    
+    // Clear equipment details
+    setCategoria("");
+    setUbicacion("");
+    setPreguntas([]);
+  } catch (error) {
+    console.error(error);
+    setStatusMessage("Error al enviar");
+  }
+};
+```
+
+## State Flow Diagram
+
+```
+Page Load
+  ↓
+[Mount Effect]
+setMounted(true)
+  ↓
+[Auth Effect]
+├─ Check localStorage
+│  ├─ Authenticated → setUsuario()
+│  └─ Not Authenticated → router.push("/login")
+└─ setApiUrl()
+  ↓
+[Data Loading Effect]
+├─ Initialize date/time
+├─ Load catalogs (Promise.all)
+│  ├─ /api/divisiones/ → setDivisiones()
+│  ├─ /api/areas/ → setAreas()
+│  ├─ /api/zonas/ → setZonas()
+│  └─ /api/equipos/ → setEquipos()
+└─ Check URL parameter
+   └─ If equipo parameter exists
+      ├─ Load equipment details
+      ├─ setFormData() with division/area/zona
+      ├─ setUbicacion()
+      ├─ setCategoria()
+      └─ Load questions → setPreguntas()
+  ↓
+[Render Form]
+User interacts with form
+  ↓
+[User Changes]
+├─ onChange handlers
+└─ Update formData state
+  ↓
+[Form Submission]
+├─ Calculate horaFin
+├─ POST to /api/guardar/
+└─ Reset all form state
+```
+
+## State Management Best Practices
+
+### ✅ Good Patterns Used
+
+1. **Functional setState** for complex objects
+   ```javascript
+   setFormData(prev => ({ ...prev, fecha: newDate }))
+   ```
+
+2. **State co-location** - state lives close to where it's used
+
+3. **Immutable updates** - always create new objects/arrays
+
+4. **Effect dependencies** - properly declared dependency arrays
+
+5. **Conditional rendering** - using `mounted` state to prevent hydration issues
+
+### ⚠️ Areas for Improvement
+
+1. **Excessive state slices** - 14 separate state variables could be consolidated
+
+2. **No loading states** - no indication when data is being fetched
+
+3. **No error states** - errors are logged but not shown to users
+
+4. **No state persistence** - form progress is lost on page refresh
+
+5. **No optimistic updates** - no immediate feedback on form submission
+
+### Suggested Improvements
+
+<Info>
+**Consider using a state management solution** like:
+- **React Query / TanStack Query**: For server state (catalogs, questions)
+- **Zustand / Jotai**: For global client state (user session)
+- **useReducer**: For complex form state with validation logic
+</Info>
+
+#### Example: Consolidating State with useReducer
+
+```javascript
+const initialState = {
+  formData: { /* ... */ },
+  catalogs: {
+    divisiones: [],
+    areas: [],
+    zonas: [],
+    equipos: []
+  },
+  equipment: {
+    categoria: "",
+    ubicacion: "",
+    preguntas: []
+  },
+  ui: {
+    mounted: false,
+    loading: false,
+    statusMessage: ""
+  }
+};
+
+function formReducer(state, action) {
+  switch (action.type) {
+    case 'SET_CATALOGS':
+      return { ...state, catalogs: action.payload };
+    case 'SET_FORM_FIELD':
+      return {
+        ...state,
+        formData: { ...state.formData, [action.field]: action.value }
+      };
+    // ... more actions
+  }
+}
+
+const [state, dispatch] = useReducer(formReducer, initialState);
+```
+
+## Debugging State
+
+To debug state in development:
+
+```javascript
+useEffect(() => {
+  console.log('FormData:', formData);
+  console.log('Preguntas:', preguntas);
+  console.log('Usuario:', usuario);
+}, [formData, preguntas, usuario]);
+```
+
+Or use React DevTools to inspect component state in real-time.

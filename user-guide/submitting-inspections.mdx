@@ -1,0 +1,457 @@
+---
+title: 'Submitting Inspections'
+description: 'Complete guide to submitting inspection forms and understanding the submission process'
+---
+
+# Submitting Inspections
+
+Once you've completed filling out your inspection form, the final step is to submit it to the system for storage and processing.
+
+## Submission Button
+
+At the bottom of the inspection form, you'll find the submission button:
+
+- **Label**: "Enviar" (Send)
+- **Type**: Submit button
+- **Location**: Bottom of the form, after the Observaciones field
+- **Styling**: Primary action button (class `jsx-8e61cfe740c0e4d1`)
+
+<Note>
+  The button submits the entire form, including all technical questions, observations, and metadata.
+</Note>
+
+## Before Submitting
+
+Before clicking "Enviar", ensure you've completed:
+
+<Steps>
+  <Step title="Basic Information">
+    - ✅ Fecha (Date) is correct
+    - ✅ Hora de Inicio (Start Time) is filled
+    - ✅ Hora de Fin (End Time) is filled (if required)
+  </Step>
+  
+  <Step title="Equipment Selection">
+    - ✅ División (Division) is selected
+    - ✅ Área (Area) is selected
+    - ✅ Zona (Zone) is selected
+    - ✅ Equipo (Equipment) is selected
+  </Step>
+  
+  <Step title="Technical Questions">
+    - ✅ All inspection questions are answered (OK, NOK, or NA)
+    - ✅ Review your answers for accuracy
+  </Step>
+  
+  <Step title="Observations">
+    - ✅ Add any necessary notes in the Observaciones field
+    - ✅ Explain any NOK (failed) items in detail
+  </Step>
+</Steps>
+
+<Warning>
+  Once submitted, you cannot edit the inspection. Make sure all information is accurate before clicking "Enviar".
+</Warning>
+
+## The Submission Process
+
+When you click the "Enviar" button, here's what happens:
+
+<Steps>
+  <Step title="Form Validation">
+    The browser validates that all required fields are filled (HTML5 validation).
+  </Step>
+  
+  <Step title="Prevent Default Behavior">
+    The form submission prevents the default browser behavior to handle the submission via JavaScript (`e.preventDefault()`).
+  </Step>
+  
+  <Step title="Data Preparation">
+    The system prepares the submission payload with all form data (see [Data Payload Structure](#data-payload-structure) below).
+  </Step>
+  
+  <Step title="API Request">
+    An HTTP POST request is sent to:
+    
+    **Endpoint**: `http://10.107.194.110/insp/api/guardar/`
+    
+    **Method**: POST
+    
+    **Headers**:
+    ```json
+    {
+      "Content-Type": "application/json"
+    }
+    ```
+    
+    **Body**: JSON-encoded form data
+  </Step>
+  
+  <Step title="Server Processing">
+    The backend API receives the data, validates it, and stores it in the database.
+  </Step>
+  
+  <Step title="Response Handling">
+    The system processes the server response and displays appropriate feedback (see [Response Messages](#response-messages) below).
+  </Step>
+</Steps>
+
+## Data Payload Structure
+
+When you submit the form, the following data is sent to the API:
+
+### Core Form Fields
+
+```json
+{
+  "fecha": "2026-03-06",
+  "horaInicio": "14:30:00",
+  "horaFin": "15:45:00",
+  "division": "1",
+  "area": "3",
+  "zona": "7",
+  "equipo": "42",
+  "observaciones": "Equipment checked and functioning normally. Minor oil leak noted on NOK item.",
+  "tecnicos": {
+    "pregunta-1": "OK",
+    "pregunta-2": "OK",
+    "pregunta-3": "NOK",
+    "pregunta-4": "NA",
+    "pregunta-5": "OK"
+  }
+}
+```
+
+### Field Descriptions
+
+| Field | Type | Description | Example |
+|-------|------|-------------|----------|
+| **fecha** | String (ISO date) | Inspection date | "2026-03-06" |
+| **horaInicio** | String (time) | Start time of inspection | "14:30:00" |
+| **horaFin** | String (time) | End time of inspection | "15:45:00" |
+| **division** | String/Number | Selected division ID | "1" |
+| **area** | String/Number | Selected area ID | "3" |
+| **zona** | String/Number | Selected zone ID | "7" |
+| **equipo** | String/Number | Selected equipment ID | "42" |
+| **observaciones** | String | Additional notes and comments | "Minor oil leak..." |
+| **tecnicos** | Object | Technical question responses | See below |
+
+### Tecnicos Object Structure
+
+The `tecnicos` object contains the answers to all technical inspection questions:
+
+- **Key format**: `pregunta-[question_id]`
+- **Value options**: 
+  - `"OK"` - Item passes inspection
+  - `"NOK"` - Item fails inspection  
+  - `"NA"` - Item not applicable
+
+<Info>
+  The tecnicos object is dynamically built based on the questions loaded for the equipment category. Different equipment types will have different question sets.
+</Info>
+
+## Response Messages
+
+After submission, the system displays status messages to inform you of the result.
+
+### Success Response
+
+When the inspection is successfully submitted:
+
+**Message**: "Formulario enviado correctamente" (Form submitted correctly)
+
+**What happens**:
+1. Success message displays at the bottom of the form (class `status`)
+2. Data is stored in the backend database
+3. The form remains on screen (you may need to refresh or navigate away)
+
+<Info>
+  After a successful submission, you can:
+  - Click the browser back button to return to a list (if applicable)
+  - Navigate to a new inspection
+  - Log out
+  - Refresh the page to start a new inspection
+</Info>
+
+### Error Response
+
+If the submission fails:
+
+**Message**: "Error al enviar" (Error sending)
+
+**Possible Causes**:
+- Network connectivity issues
+- API server unavailable
+- Invalid data format
+- Server-side validation errors
+- Database connection problems
+
+<Warning>
+  If you see "Error al enviar":
+  1. **Do not refresh** the page immediately (you may lose your data)
+  2. Check your network connection
+  3. Try clicking "Enviar" again
+  4. If the error persists, copy your observaciones text to a safe place
+  5. Take screenshots of your answers if possible
+  6. Contact technical support
+</Warning>
+
+## Status Message Display
+
+Status messages appear in a dedicated element:
+
+- **CSS Class**: `status`
+- **Location**: Below the submission button
+- **Purpose**: Provide real-time feedback on submission status
+
+### Message States
+
+The status element shows different messages throughout the process:
+
+1. **Initial State**: Empty or hidden
+2. **Submitting State**: May show loading indicator (implementation-dependent)
+3. **Success State**: "Formulario enviado correctamente"
+4. **Error State**: "Error al enviar"
+
+## After Submission
+
+### Successful Submission
+
+After a successful submission:
+
+<Steps>
+  <Step title="Verify Success Message">
+    Confirm you see "Formulario enviado correctamente" on screen.
+  </Step>
+  
+  <Step title="Record Confirmation">
+    Optionally, take a screenshot or note the time of submission for your records.
+  </Step>
+  
+  <Step title="Start New Inspection (Optional)">
+    If you need to perform another inspection:
+    - Refresh the page, or
+    - Navigate to the home page, or  
+    - Use a new URL with different equipment parameter
+  </Step>
+  
+  <Step title="Log Out (Optional)">
+    If you're finished with inspections, click "Cerrar Sesión" to log out.
+  </Step>
+</Steps>
+
+### Failed Submission
+
+If submission fails:
+
+<Steps>
+  <Step title="Check Network Connection">
+    Verify you're connected to the network and can access other internal resources.
+  </Step>
+  
+  <Step title="Retry Submission">
+    Click the "Enviar" button again to retry.
+  </Step>
+  
+  <Step title="Preserve Your Data">
+    If errors persist:
+    - Copy your Observaciones text to a safe place
+    - Take screenshots of the form (especially the technical questions table)
+    - Note which equipment you were inspecting
+  </Step>
+  
+  <Step title="Contact Support">
+    Reach out to technical support or your system administrator with:
+    - The error message
+    - The equipment you were inspecting  
+    - The approximate time of the error
+    - Any browser console errors (if you can access them)
+  </Step>
+</Steps>
+
+## Technical Details
+
+### API Endpoint Specification
+
+**Base URL**: `http://10.107.194.110/insp/`
+
+**Submit Endpoint**: `/api/guardar/`
+
+**Full URL**: `http://10.107.194.110/insp/api/guardar/`
+
+### HTTP Request Details
+
+```http
+POST /insp/api/guardar/ HTTP/1.1
+Host: 10.107.194.110
+Content-Type: application/json
+
+{
+  "fecha": "2026-03-06",
+  "horaInicio": "14:30:00",
+  "horaFin": "15:45:00",
+  "division": "1",
+  "area": "3",
+  "zona": "7",
+  "equipo": "42",
+  "observaciones": "Equipment checked...",
+  "tecnicos": {
+    "pregunta-1": "OK",
+    "pregunta-2": "NOK"
+  }
+}
+```
+
+### Expected Response Format
+
+**Success Response**:
+```json
+{
+  "status": "success",
+  "message": "Inspection saved successfully",
+  "id": 12345
+}
+```
+
+**Error Response**:
+```json
+{
+  "status": "error",
+  "message": "Validation failed",
+  "errors": []
+}
+```
+
+<Note>
+  The exact response format may vary based on backend implementation. The client primarily checks for successful HTTP status codes.
+</Note>
+
+## Data Persistence
+
+Understanding what happens to your submitted data:
+
+### Where Data Goes
+
+1. **Backend API**: Receives the JSON payload at `/api/guardar/`
+2. **Validation Layer**: Validates required fields and data formats
+3. **Database**: Stores the inspection record permanently
+4. **Audit Trail**: May log submission metadata (user, timestamp, etc.)
+
+### Data Retention
+
+Submitted inspections are typically:
+
+- Stored permanently for compliance and historical records
+- Associated with your user account (`usuario_inspeccion` from localStorage)
+- Timestamped with submission date and time
+- Queryable for reports and analysis
+
+<Info>
+  For questions about data retention policies, report generation, or accessing historical inspections, contact your system administrator.
+</Info>
+
+## Troubleshooting
+
+### "Enviar" Button Doesn't Respond
+
+**Possible Causes**:
+- JavaScript error on the page
+- Form validation failure (HTML5)
+- Button click handler not registered
+
+**Solutions**:
+1. Check browser console for JavaScript errors
+2. Ensure all required fields are filled
+3. Try refreshing the page and re-entering data
+4. Try a different browser
+
+### Submission Takes Too Long
+
+**Possible Causes**:
+- Slow network connection
+- API server processing delays
+- Large observaciones text
+
+**Solutions**:
+1. Wait patiently for the response (up to 30 seconds)
+2. Check network connection speed
+3. Avoid refreshing the page during submission
+
+### Submission Succeeds But Data Missing
+
+**Possible Causes**:
+- Backend storage error
+- Database constraint violation
+- Data transformation issues
+
+**Solutions**:
+1. Contact system administrator immediately
+2. Provide the inspection details you submitted
+3. Check if the issue is systemic or isolated
+
+### Double Submission
+
+**Problem**: Accidentally clicking "Enviar" multiple times
+
+**Impact**: May create duplicate inspection records
+
+**Prevention**:
+- Click the "Enviar" button only once
+- Wait for the success/error message before taking further action
+
+<Warning>
+  Avoid clicking "Enviar" multiple times. If you don't see a response after 30 seconds, check your network connection before retrying.
+</Warning>
+
+## Best Practices
+
+### Before Submitting
+
+1. ✅ **Review all answers**: Double-check your technical question responses
+2. ✅ **Explain NOK items**: Use Observaciones to document any failed items  
+3. ✅ **Verify equipment**: Ensure you selected the correct equipment
+4. ✅ **Check times**: Confirm start and end times are accurate
+
+### During Submission
+
+1. ✅ **Click once**: Press "Enviar" only one time
+2. ✅ **Stay on page**: Don't navigate away during submission
+3. ✅ **Wait for feedback**: Look for the success or error message
+
+### After Submission
+
+1. ✅ **Confirm success**: Verify you see "Formulario enviado correctamente"
+2. ✅ **Clear session**: Refresh or log out to start fresh for the next inspection
+3. ✅ **Report issues**: If submission failed, report to support immediately
+
+## Integration with Other Systems
+
+Submitted inspection data may integrate with:
+
+- **CMMS**: Computerized Maintenance Management System
+- **ERP**: Enterprise Resource Planning system
+- **BI Tools**: Business Intelligence and reporting platforms
+- **Compliance Systems**: Safety and regulatory compliance tracking
+
+<Info>
+  The specific integrations depend on your organization's configuration. Contact your system administrator for details about downstream data flow.
+</Info>
+
+## Next Steps
+
+After successfully submitting an inspection:
+
+- Start a [new inspection](/user-guide/inspection-form)
+- Review [equipment selection](/user-guide/equipment-selection) for different equipment
+- [Log out](/user-guide/authentication) if you're finished
+
+## Need Help?
+
+If you encounter persistent issues with submission:
+
+1. **Document the error**: Screenshot the error message
+2. **Check network**: Verify connectivity to internal systems
+3. **Try again**: Refresh and attempt submission once more
+4. **Contact support**: Reach out with specific error details
+
+For questions about the data, reports, or system configuration, contact your technical administrator or IT support team.

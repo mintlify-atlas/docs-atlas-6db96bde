@@ -1,0 +1,592 @@
+---
+title: Configuration
+description: Configure API endpoints, authentication, and application settings
+---
+
+## Overview
+
+The Production Inspection Form requires configuration for API connectivity, authentication, and deployment settings. This guide covers all configurable aspects of the application.
+
+<Warning>
+Configuration changes require rebuilding the application. Always test configuration changes in a development environment before deploying to production.
+</Warning>
+
+---
+
+## API Configuration
+
+### API Endpoint Settings
+
+The application connects to a backend API server for data operations and authentication.
+
+#### Primary API Endpoint
+
+The API base URL is configured in the main application component:
+
+**File**: `app/page.jsx`
+
+```javascript
+const [apiBase, setApiBase] = useState(null)
+
+useEffect(() => {
+  setApiBase('http://10.107.194.110/insp/')
+}, [])
+```
+
+<Note>
+**Current API Endpoint**: `http://10.107.194.110/insp/`
+
+All API requests are made relative to this base URL.
+</Note>
+
+#### Available API Endpoints
+
+The application interacts with the following API endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|--------|
+| `/api/login-ldap/` | POST | LDAP user authentication |
+| `/api/divisiones/` | GET | Fetch division list |
+| `/api/areas/` | GET | Fetch area list |
+| `/api/zonas/` | GET | Fetch zone list |
+| `/api/equipos/` | GET | Fetch equipment list |
+| `/api/preguntas/{category}/` | GET | Fetch inspection questions by category |
+| `/api/guardar/` | POST | Save completed inspection form |
+
+### Modifying the API Endpoint
+
+To configure a different API server:
+
+<Steps>
+
+**1. Update the API base URL** in `app/page.jsx`:
+
+```javascript
+useEffect(() => {
+  setApiBase('https://your-api-server.com/api/')
+}, [])
+```
+
+**2. Update the login API** in `app/login/page.jsx`:
+
+```javascript
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  try {
+    const response = await fetch(
+      `https://your-api-server.com/api/login-ldap/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      }
+    )
+    // ... rest of login logic
+  } catch (error) {
+    console.error(error)
+  }
+}
+```
+
+**3. Rebuild the application:**
+
+```bash
+npm run build
+```
+
+</Steps>
+
+---
+
+## Authentication Configuration
+
+### LDAP Authentication
+
+The application uses LDAP for user authentication through the backend API.
+
+#### Authentication Flow
+
+```javascript
+// Login request
+const response = await fetch(`${API_BASE}/api/login-ldap/`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    username: username,
+    password: password
+  })
+})
+
+const data = await response.json()
+
+if (data.status === 'ok') {
+  // Store user credentials in localStorage
+  localStorage.setItem('usuario_inspeccion', username)
+  localStorage.setItem('usuario_nombre', `${data.first_name} ${data.last_name}`)
+  
+  // Redirect to inspection form
+  router.push('/')
+}
+```
+
+#### Expected API Response
+
+**Successful Login**:
+```json
+{
+  "status": "ok",
+  "first_name": "Juan",
+  "last_name": "Pérez"
+}
+```
+
+**Failed Login**:
+```json
+{
+  "status": "error",
+  "message": "Invalid credentials"
+}
+```
+
+### Session Management
+
+User sessions are managed using browser `localStorage`:
+
+| Key | Purpose |
+|-----|--------|
+| `usuario_inspeccion` | Stores the username |
+| `usuario_nombre` | Stores the full name (first + last) |
+| `redirect_after_login` | Stores the URL to redirect after successful login |
+
+#### Authentication Guard
+
+The main form page checks for authentication on load:
+
+```javascript
+useEffect(() => {
+  const usuario = localStorage.getItem('usuario_inspeccion')
+  const nombreCompleto = localStorage.getItem('usuario_nombre')
+  
+  if (!usuario) {
+    // Store current URL for redirect after login
+    const currentUrl = window.location.href
+    localStorage.setItem('redirect_after_login', currentUrl)
+    router.push('/login')
+  } else {
+    setUsername(nombreCompleto || usuario)
+  }
+}, [])
+```
+
+### Logout Functionality
+
+```javascript
+const handleLogout = () => {
+  localStorage.removeItem('usuario_inspeccion')
+  localStorage.removeItem('usuario_nombre')
+  router.push('/login')
+}
+```
+
+---
+
+## Next.js Configuration
+
+### Base Path Configuration
+
+The application is configured to run at a specific base path for deployment.
+
+**File**: `next.config.js`
+
+```javascript
+module.exports = {
+  basePath: '/insp_pry/inspecciones',
+  output: 'export',
+  trailingSlash: true,
+  
+  // Asset prefix for CDN (if needed)
+  // assetPrefix: 'https://cdn.example.com',
+  
+  // Image optimization (disabled for static export)
+  images: {
+    unoptimized: true
+  }
+}
+```
+
+<Note>
+**Current Base Path**: `/insp_pry/inspecciones`
+
+All routes in the application are prefixed with this path.
+</Note>
+
+### Changing the Base Path
+
+To deploy at a different path:
+
+<Steps>
+
+**1. Update `next.config.js`:**
+
+```javascript
+module.exports = {
+  basePath: '/your-custom-path',
+  output: 'export',
+  trailingSlash: true
+}
+```
+
+**2. Rebuild and redeploy:**
+
+```bash
+npm run build
+```
+
+**3. Update web server configuration** to serve from the new path.
+
+</Steps>
+
+---
+
+## Form Configuration
+
+### Pre-filled Form Data
+
+The inspection form can be pre-populated using URL query parameters.
+
+#### Equipment Pre-selection
+
+Pass equipment ID in the URL to pre-populate form fields:
+
+```
+https://your-domain.com/insp_pry/inspecciones/?equipo=123
+```
+
+The application reads the `equipo` parameter and loads:
+- Division
+- Area
+- Zone
+- Equipment details
+- Physical location
+- Equipment category
+- Inspection questions for that category
+
+**Implementation**:
+
+```javascript
+const searchParams = useSearchParams()
+const equipoId = searchParams.get('equipo')
+
+useEffect(() => {
+  if (equipoId) {
+    // Fetch equipment details
+    fetch(`${apiBase}/api/equipos/`)
+      .then(res => res.json())
+      .then(equipos => {
+        const equipo = equipos.find(e => String(e.id) === String(equipoId))
+        if (equipo) {
+          setFormData(prev => ({
+            ...prev,
+            equipo: equipoId,
+            division: equipo.division_id,
+            area: equipo.area_id,
+            zona: equipo.zona_id
+          }))
+          setUbicacion(equipo.ubicacion)
+          setCategoria(equipo.categoria)
+        }
+      })
+  }
+}, [equipoId, apiBase])
+```
+
+### Inspection Questions
+
+Inspection questions are loaded dynamically based on equipment category:
+
+```javascript
+fetch(`${apiBase}/api/preguntas/${categoria}/`)
+  .then(res => res.json())
+  .then(setPreguntas)
+```
+
+#### Question Format
+
+Each question has three possible responses:
+- **OK**: Item is satisfactory
+- **NOK**: Item needs attention
+- **NA**: Not applicable
+
+---
+
+## Styling Configuration
+
+### Brand Colors
+
+The application uses Goodyear brand colors:
+
+```css
+:root {
+  --primary-blue: #003399;     /* Primary brand color */
+  --primary-yellow: #FFD200;   /* Accent color */
+  --hover-blue: #002277;       /* Hover states */
+  --error-red: #cc0000;        /* Error messages */
+}
+```
+
+### Component Styling
+
+The application uses **styled-jsx** for component-scoped CSS:
+
+```jsx
+<style jsx>{`
+  .container {
+    max-width: 850px;
+    margin: 1rem auto;
+    background: #fff;
+    padding: 1.2rem;
+    border-radius: 12px;
+    border: 3px solid #FFD200;
+  }
+  
+  h1 {
+    color: #003399;
+    text-align: center;
+  }
+  
+  button {
+    background: #003399;
+    color: white;
+    padding: 0.8rem;
+    border-radius: 6px;
+  }
+  
+  button:hover {
+    background: #002277;
+  }
+`}</style>
+```
+
+### Custom Logo
+
+Replace the Goodyear logo by updating:
+
+**File**: `public/logo-goodyear.png`
+
+```jsx
+<img src="logo-goodyear.png" alt="Company Logo" className="logo" />
+```
+
+---
+
+## Environment Variables
+
+While the current implementation uses hardcoded values, you can implement environment-based configuration:
+
+<Steps>
+
+**1. Create `.env.local` file:**
+
+```bash
+NEXT_PUBLIC_API_BASE=http://10.107.194.110/insp/
+NEXT_PUBLIC_APP_NAME=Production Inspection Form
+NEXT_PUBLIC_COMPANY_NAME=Goodyear
+```
+
+**2. Update code to use environment variables:**
+
+```javascript
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE
+
+useEffect(() => {
+  setApiBase(API_BASE)
+}, [])
+```
+
+**3. Create environment-specific files:**
+
+- `.env.development` - Development environment
+- `.env.production` - Production environment
+- `.env.local` - Local overrides (git-ignored)
+
+</Steps>
+
+<Warning>
+For static exports, environment variables are embedded at **build time**. You must rebuild the application when changing environment variables.
+</Warning>
+
+---
+
+## Localization
+
+The application is currently configured for Spanish language (`lang="es"`).
+
+### Language Settings
+
+**File**: `app/layout.jsx`
+
+```jsx
+export default function RootLayout({ children }) {
+  return (
+    <html lang="es">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </head>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### Metadata Configuration
+
+```jsx
+export const metadata = {
+  title: 'Inspecciones',
+  description: 'Página para inspecciones',
+  icons: {
+    icon: '/favicon.ico',
+  },
+}
+```
+
+---
+
+## Security Considerations
+
+### HTTPS Configuration
+
+<Warning>
+The current API endpoint uses HTTP (`http://10.107.194.110/insp/`). For production environments, always use HTTPS to protect user credentials and inspection data.
+</Warning>
+
+To enforce HTTPS:
+
+1. Configure SSL/TLS certificates on the API server
+2. Update API endpoint to use `https://`
+3. Implement HSTS headers on the web server
+
+### CORS Configuration
+
+Ensure the API server includes appropriate CORS headers:
+
+```
+Access-Control-Allow-Origin: https://your-domain.com
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization
+```
+
+### Content Security Policy
+
+Implement CSP headers for additional security:
+
+```
+Content-Security-Policy: 
+  default-src 'self'; 
+  script-src 'self' 'unsafe-inline' 'unsafe-eval'; 
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data:;
+  connect-src 'self' http://10.107.194.110;
+```
+
+---
+
+## Advanced Configuration
+
+### Custom Build ID
+
+Generate a custom build ID for cache busting:
+
+```javascript
+// next.config.js
+module.exports = {
+  generateBuildId: async () => {
+    return 'my-build-id-' + Date.now()
+  }
+}
+```
+
+### Compression
+
+Enable gzip compression in your web server configuration:
+
+```nginx
+gzip on;
+gzip_vary on;
+gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+```
+
+---
+
+## Validation
+
+### Configuration Testing
+
+After making configuration changes:
+
+<Steps>
+
+**1. Test API connectivity:**
+
+```javascript
+fetch('http://10.107.194.110/insp/api/divisiones/')
+  .then(res => res.json())
+  .then(console.log)
+  .catch(console.error)
+```
+
+**2. Verify authentication:**
+
+- Test login with valid LDAP credentials
+- Confirm localStorage values are set correctly
+- Verify redirect after successful login
+
+**3. Test form submission:**
+
+- Fill out inspection form
+- Submit and verify API call succeeds
+- Check network tab for proper request/response
+
+</Steps>
+
+---
+
+## Troubleshooting
+
+### API Connection Failures
+
+**Problem**: API requests fail or timeout.
+
+**Solution**: 
+- Verify network connectivity to `10.107.194.110`
+- Check firewall rules
+- Confirm API server is running
+- Review CORS configuration
+
+### Authentication Issues
+
+**Problem**: Login fails with valid credentials.
+
+**Solution**:
+- Check LDAP server connectivity
+- Verify API endpoint `/api/login-ldap/` is correct
+- Review API response format
+- Check browser console for error messages
+
+### Build Path Mismatches
+
+**Problem**: Static assets return 404 after deployment.
+
+**Solution**:
+- Verify `basePath` in `next.config.js` matches deployment path
+- Check web server configuration
+- Confirm all asset references use correct base path
+
+---
+
+## Next Steps
+
+- Review deployment procedures: [Deployment](/getting-started/deployment)
+- Set up monitoring and logging
+- Configure automated backups
+- Implement analytics tracking

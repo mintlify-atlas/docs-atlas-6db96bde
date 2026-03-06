@@ -1,0 +1,298 @@
+---
+title: 'Equipment Selection'
+description: 'How to navigate the division, area, zone hierarchy and select equipment for inspection'
+---
+
+# Equipment Selection
+
+The equipment selection process uses a hierarchical filtering system to help you find the specific equipment you need to inspect.
+
+## Understanding the Hierarchy
+
+The system organizes equipment using a four-level hierarchy:
+
+```
+División (Division)
+  └─ Área (Area)
+      └─ Zona (Zone)
+          └─ Equipo (Equipment)
+```
+
+Each level filters the options available in the next level, ensuring you only see relevant equipment for your selected location.
+
+<Note>
+  This hierarchical approach prevents confusion and ensures equipment is inspected by the appropriate personnel in the correct organizational context.
+</Note>
+
+## Selection Process
+
+Follow these steps to select equipment for inspection:
+
+<Steps>
+  <Step title="Select División (Division)">
+    Start by selecting a division from the first dropdown.
+    
+    **Data Source**: The divisions are loaded from `/api/divisiones/` when the form initializes.
+    
+    **What it represents**: The highest level of organizational structure, typically representing major departments or production lines.
+    
+    <Info>
+      If the dropdown is empty or not loading, check that:
+      - You're logged in
+      - The API server is accessible
+      - Your network connection is stable
+    </Info>
+  </Step>
+  
+  <Step title="Select Área (Area)">
+    After choosing a division, select an area from the second dropdown.
+    
+    **Data Source**: Areas are loaded from `/api/areas/`
+    
+    **Filtering**: The dropdown automatically filters to show only areas that belong to your selected division.
+    
+    **What it represents**: A subdivision within the division, often representing specific production zones or functional areas.
+  </Step>
+  
+  <Step title="Select Zona (Zone)">
+    With a division and area selected, choose a zone from the third dropdown.
+    
+    **Data Source**: Zones are loaded from `/api/zonas/`
+    
+    **Filtering**: Shows only zones within the selected area.
+    
+    **What it represents**: A specific physical location or sub-area within the broader area.
+  </Step>
+  
+  <Step title="Select Equipo (Equipment)">
+    Finally, select the specific equipment to inspect from the fourth dropdown.
+    
+    **Data Source**: Equipment items are loaded from `/api/equipos/`
+    
+    **Filtering**: Shows only equipment located in the selected zone.
+    
+    **What it represents**: The actual machine, tool, or asset you'll be inspecting.
+  </Step>
+</Steps>
+
+## Automatic Field Population
+
+Once you select an equipment item, the form automatically populates related fields:
+
+### Ubicación Física (Physical Location)
+
+This field displays the physical location description from the equipment record.
+
+- **Source**: Equipment data's `ubicacion` property
+- **Display**: Read-only text field
+- **Purpose**: Confirms you're at the correct physical location
+
+### Categoría del Equipo (Equipment Category)
+
+This field shows the equipment's category classification.
+
+- **Source**: Equipment data's `categoria` property  
+- **Display**: Read-only text field
+- **Critical Function**: Triggers the loading of category-specific inspection questions
+
+<Warning>
+  The equipment category is essential for loading the correct inspection checklist. If an equipment item has no category assigned, the technical questions table may not populate correctly.
+</Warning>
+
+## Dynamic Question Loading
+
+The equipment selection directly impacts what questions appear in your inspection form:
+
+<Steps>
+  <Step title="Category Identified">
+    When you select equipment, the system reads its `categoria` value.
+  </Step>
+  
+  <Step title="Questions Fetched">
+    The system makes an API call to `/api/preguntas/[categoria]/` to fetch category-specific questions.
+  </Step>
+  
+  <Step title="Table Populated">
+    The technical inspection table is populated with the relevant questions for that equipment type.
+  </Step>
+</Steps>
+
+### Error Handling
+
+If questions fail to load:
+
+- **Console Message**: "Error cargando preguntas" (Error loading questions)
+- **Possible Causes**:
+  - Network connectivity issues
+  - Invalid category value
+  - API endpoint unavailable
+  - No questions defined for this category
+
+<Info>
+  If you encounter this error, try:
+  1. Reselecting the equipment
+  2. Refreshing the page
+  3. Checking with your administrator that questions exist for this equipment category
+</Info>
+
+## Pre-selecting Equipment via URL
+
+You can bypass the manual selection process by using a URL parameter.
+
+### URL Parameter Syntax
+
+```
+https://your-inspection-site.com/?equipo=[equipment_id]
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Parse URL Parameter">
+    On form load, the system checks for the `equipo` query parameter using `useSearchParams()`.
+  </Step>
+  
+  <Step title="Fetch Equipment Data">
+    If found, it fetches full equipment details from `/api/equipos/` and finds the matching equipment by ID.
+  </Step>
+  
+  <Step title="Auto-populate Hierarchy">
+    The form automatically fills in:
+    - División: From equipment's `division_id`
+    - Área: From equipment's `area_id`  
+    - Zona: From equipment's `zona_id`
+    - Equipo: The equipment ID from the URL
+  </Step>
+  
+  <Step title="Load Questions">
+    The system automatically loads the category-specific questions for the selected equipment.
+  </Step>
+</Steps>
+
+### Use Cases for URL Parameters
+
+<Info>
+  **QR Code Integration**: Attach QR codes to equipment that encode the inspection URL with the equipment ID. Technicians can scan the code to instantly load the correct inspection form.
+  
+  **Equipment Management Links**: Link directly from equipment databases or CMMS systems.
+  
+  **Scheduled Inspections**: Include direct links in inspection schedules or work orders.
+  
+  **Bookmarks**: Save frequently inspected equipment as browser bookmarks.
+</Info>
+
+### Example Workflow
+
+1. Generate QR code with URL: `https://your-site.com/?equipo=456`
+2. Attach QR code to Equipment #456
+3. Technician scans QR code on mobile device
+4. Inspection form opens with Equipment #456 pre-selected
+5. All hierarchy fields and questions automatically loaded
+6. Technician can immediately begin inspection
+
+## Data Loading Sequence
+
+Understanding the data loading sequence helps troubleshoot issues:
+
+### On Form Mount (useEffect)
+
+1. ✅ Set mounted state to `true`
+2. ✅ Check for user authentication in localStorage
+3. ✅ Set API base URL: `http://10.107.194.110/insp/`
+4. ✅ Initialize date and time fields with current values
+
+### Parallel API Calls (Promise.all)
+
+5. ✅ Fetch divisiones (divisions)
+6. ✅ Fetch areas (areas)  
+7. ✅ Fetch zonas (zones)
+8. ✅ Fetch equipos (equipment)
+
+### URL Parameter Handling
+
+9. ✅ Check for `?equipo=` parameter
+10. ✅ If found, fetch equipment details
+11. ✅ Auto-populate hierarchy dropdowns
+12. ✅ Fetch category-specific questions
+
+<Note>
+  All API calls include error handling with `.catch()` that returns empty arrays `[]` to prevent the form from breaking if an endpoint fails.
+</Note>
+
+## Troubleshooting Equipment Selection
+
+### Dropdowns Are Empty
+
+**Possible Causes**:
+- API endpoints not responding
+- Network connectivity issues
+- Authentication problems
+- API server is down
+
+**Solutions**:
+1. Check browser console for API errors
+2. Verify you're logged in (check for localStorage `usuario_inspeccion`)
+3. Refresh the page
+4. Contact system administrator
+
+### Equipment Doesn't Show Expected Options
+
+**Possible Causes**:
+- Equipment not assigned to selected zone
+- Data hierarchy mismatch in database
+- Filtering logic excluding equipment
+
+**Solutions**:
+1. Verify with administrator that equipment is properly assigned
+2. Check equipment records in the database
+3. Try selecting different zone/area/division combinations
+
+### Questions Don't Load After Selecting Equipment
+
+**Error Message**: "Error cargando preguntas"
+
+**Possible Causes**:
+- Equipment has no category assigned
+- No questions exist for this category
+- `/api/preguntas/[categoria]/` endpoint error
+
+**Solutions**:
+1. Check that equipment has a valid `categoria` value
+2. Verify questions exist for this category in the database
+3. Check browser console for specific API error
+4. Contact administrator to add questions for this category
+
+### URL Parameter Doesn't Work
+
+**Error Message**: "Error cargando equipo"
+
+**Possible Causes**:
+- Invalid equipment ID
+- Equipment doesn't exist
+- API call failed
+
+**Solutions**:
+1. Verify the equipment ID is correct
+2. Check that equipment exists in `/api/equipos/`
+3. Try accessing the form without parameters and selecting manually
+
+## Best Practices
+
+<Warning>
+  **Always follow the hierarchy order**: Select División → Área → Zona → Equipo in sequence. Skipping levels or selecting out of order may cause filtering issues.
+</Warning>
+
+<Info>
+  **For frequent inspections**: Use URL parameters with equipment IDs to save time and reduce selection errors.
+</Info>
+
+<Note>
+  **Verify location**: Always check the "Ubicación Física" field after selection to confirm you're inspecting the correct equipment.
+</Note>
+
+## Next Steps
+
+After selecting your equipment:
+
+- Return to [Inspection Form](/user-guide/inspection-form) to complete the inspection
+- Learn how to [Submit Inspections](/user-guide/submitting-inspections)

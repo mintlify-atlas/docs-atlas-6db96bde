@@ -1,0 +1,588 @@
+---
+title: 'Features'
+description: 'Comprehensive overview of Production Inspection Form capabilities'
+---
+
+## Overview
+
+The Production Inspection Form is a Next.js-based technical inspection system designed for manufacturing environments. It provides a comprehensive digital solution for conducting equipment inspections, tracking technician assessments, and maintaining detailed inspection records.
+
+<CardGroup cols={2}>
+  <Card title="User Authentication" icon="lock">
+    Secure login system with user session management and credential storage
+  </Card>
+  <Card title="Dynamic Forms" icon="list-check">
+    Auto-populated inspection forms based on equipment category
+  </Card>
+  <Card title="Equipment Management" icon="gears">
+    Hierarchical organization of divisions, areas, zones, and equipment
+  </Card>
+  <Card title="Real-time API Integration" icon="plug">
+    Seamless backend connectivity for data retrieval and submission
+  </Card>
+</CardGroup>
+
+---
+
+## Authentication System
+
+The application implements a robust authentication mechanism with persistent sessions.
+
+### Key Features
+
+- **LocalStorage-based Session Management**: User credentials are stored securely in browser storage
+- **Protected Routes**: Automatic redirection to login for unauthenticated users
+- **Session Persistence**: Users remain logged in across page refreshes
+- **Logout Functionality**: Clean session termination with storage cleanup
+
+### Implementation Details
+
+```javascript
+// Authentication check on page load
+useEffect(() => {
+  let usuario = localStorage.getItem("usuario_inspeccion");
+  let nombre = localStorage.getItem("usuario_nombre");
+  
+  if (usuario) {
+    setUsuarioActual(nombre || usuario);
+  } else {
+    let currentUrl = window.location.href;
+    localStorage.setItem("redirect_after_login", currentUrl);
+    router.push("/login");
+  }
+}, []);
+```
+
+<Note>
+The system automatically saves the current URL before redirecting to login, enabling seamless return to the intended page after authentication.
+</Note>
+
+### Login Flow
+
+The login page (`/login`) provides a simple, clean interface:
+
+- Username and password input fields
+- Form validation with required field checking
+- Credential submission to backend API
+- Automatic redirection upon successful authentication
+
+---
+
+## Dynamic Inspection Forms
+
+The core functionality centers around intelligent, context-aware inspection forms that adapt based on equipment selection.
+
+### Hierarchical Data Structure
+
+The form utilizes a four-level organizational hierarchy:
+
+<CardGroup cols={2}>
+  <Card title="Division" icon="building">
+    Top-level organizational unit
+  </Card>
+  <Card title="Area" icon="map-location-dot">
+    Subdivision within a division
+  </Card>
+  <Card title="Zone" icon="location-dot">
+    Specific location within an area
+  </Card>
+  <Card title="Equipment" icon="gear">
+    Individual machinery or asset
+  </Card>
+</CardGroup>
+
+### Auto-Population Logic
+
+```javascript
+// Equipment selection triggers automatic field population
+useEffect(() => {
+  if (!apiUrl) return;
+  
+  // Fetch all hierarchical data
+  Promise.all([
+    fetch(`${apiUrl}/api/divisiones/`).then(res => res.json()).catch(() => []),
+    fetch(`${apiUrl}/api/areas/`).then(res => res.json()).catch(() => []),
+    fetch(`${apiUrl}/api/zonas/`).then(res => res.json()).catch(() => []),
+    fetch(`${apiUrl}/api/equipos/`).then(res => res.json()).catch(() => [])
+  ]).then(([divs, areas, zonas, equipos]) => {
+    setDivisiones(divs);
+    setAreas(areas);
+    setZonas(zonas);
+    setEquipos(equipos);
+  });
+  
+  // Pre-populate from URL parameter
+  let equipoId = searchParams.get("equipo");
+  if (equipoId) {
+    // Fetch equipment details and auto-fill form
+    fetch(`${apiUrl}/api/equipos/`)
+      .then(res => res.json())
+      .then(equipos => {
+        let equipo = equipos.find(e => String(e.id) === String(equipoId));
+        if (equipo) {
+          setFormData(prev => ({
+            ...prev,
+            division: equipo.division_id,
+            area: equipo.area_id,
+            zona: equipo.zona_id
+          }));
+          setUbicacionFisica(equipo.ubicacion);
+          setCategoria(equipo.categoria);
+        }
+      });
+  }
+}, [apiUrl]);
+```
+
+<Info>
+Equipment can be pre-selected via URL query parameter (`?equipo=123`), enabling QR code scanning workflows where equipment IDs are embedded in scannable codes.
+</Info>
+
+---
+
+## Category-Based Question Loading
+
+One of the most powerful features is the dynamic loading of inspection questions based on equipment category.
+
+### How It Works
+
+1. **Equipment Selection**: User selects or scans equipment
+2. **Category Identification**: System retrieves equipment category from API
+3. **Question Fetch**: Relevant questions loaded dynamically
+4. **Table Generation**: Inspection checklist rendered automatically
+
+### Question Table Interface
+
+```javascript
+// Dynamic question loading based on category
+if (equipo.categoria) {
+  fetch(`${apiUrl}/api/preguntas/${equipo.categoria}/`)
+    .then(res => res.json())
+    .then(setPreguntas)
+    .catch(err => console.error("Error cargando preguntas", err));
+}
+```
+
+The inspection table displays:
+
+- **Inspection Item**: Description of what needs to be checked
+- **OK**: Radio button for passing inspection
+- **NOK**: Radio button for failing inspection
+- **No aplica (N/A)**: Radio button for non-applicable items
+
+<Tip>
+Each inspection point is rendered as a radio button group, ensuring only one status can be selected per item.
+</Tip>
+
+### Response Handling
+
+```javascript
+// Store technician responses
+const handleTecnicoChange = (pregunta, valor) => {
+  setFormData(prev => ({
+    ...prev,
+    tecnicos: {
+      ...prev.tecnicos,
+      [pregunta]: valor
+    }
+  }));
+};
+
+// Usage in the table
+<input
+  type="radio"
+  name={`pregunta-${pregunta.id}`}
+  value="OK"
+  checked={formData.tecnicos[pregunta.descripcion] === "OK"}
+  onChange={() => handleTecnicoChange(pregunta.descripcion, "OK")}
+/>
+```
+
+---
+
+## Time Tracking
+
+The system automatically captures inspection timing for audit and performance analysis.
+
+### Automatic Timestamp Generation
+
+```javascript
+// Set start time on form load
+useEffect(() => {
+  if (!apiUrl) return;
+  
+  const now = new Date();
+  const horaInicio = now.toTimeString().split(" ")[0];
+  
+  setFormData(prev => ({
+    ...prev,
+    fecha: now.toISOString().split("T")[0],
+    horaInicio: horaInicio
+  }));
+}, [apiUrl]);
+
+// Set end time on form submission
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  const horaFin = new Date().toTimeString().split(" ")[0];
+  const payload = {
+    ...formData,
+    horaFin: horaFin,
+    usuario: usuarioActual
+  };
+  
+  // Submit to API
+  await fetch(`${apiUrl}/api/guardar/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+};
+```
+
+<Note>
+**Tracked Timestamps:**
+- Fecha (Date): Auto-filled with current date
+- Hora de Inicio (Start Time): Captured when form loads
+- Hora de Fin (End Time): Captured when form is submitted
+</Note>
+
+---
+
+## Equipment Information Display
+
+The form provides comprehensive equipment context to technicians during inspection.
+
+### Displayed Information
+
+| Field | Description | Source |
+|-------|-------------|--------|
+| División | Organizational division | API - divisions endpoint |
+| Área | Functional area | API - areas endpoint |
+| Zona | Physical zone | API - zones endpoint |
+| Equipo | Equipment name/ID | API - equipment endpoint |
+| Ubicación Física | Physical location details | Equipment record |
+| Categoría del Equipo | Equipment category type | Equipment record |
+
+### Read-Only Context Fields
+
+```javascript
+// All hierarchy fields are disabled (read-only) after auto-population
+<select value={formData.division} disabled>
+  {divisiones.map(div => (
+    <option key={div.id} value={div.id}>
+      {div.nombre}
+    </option>
+  ))}
+</select>
+```
+
+<Warning>
+Hierarchy fields (division, area, zone, equipment) are automatically populated and locked to prevent accidental modification during inspection.
+</Warning>
+
+---
+
+## Observations and Notes
+
+Technicians can document additional findings, anomalies, or recommendations.
+
+### Observations Field
+
+```javascript
+<label>Observaciones:</label>
+<textarea
+  value={formData.observaciones}
+  onChange={(e) => setFormData({
+    ...formData,
+    observaciones: e.target.value
+  })}
+  rows={4}
+/>
+```
+
+**Use Cases:**
+- Documenting visual defects not covered by checklist
+- Recording unusual noises or behaviors
+- Noting required follow-up actions
+- Adding maintenance recommendations
+
+---
+
+## Form Submission
+
+The submission process includes validation, payload construction, and backend synchronization.
+
+### Submission Workflow
+
+```javascript
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!apiUrl) return;
+  
+  // Capture end time
+  const horaFin = new Date().toTimeString().split(" ")[0];
+  
+  // Construct complete payload
+  const payload = {
+    ...formData,
+    horaFin: horaFin,
+    usuario: usuarioActual
+  };
+  
+  try {
+    // POST to backend API
+    const response = await fetch(`${apiUrl}/api/guardar/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    
+    // Display success message
+    setMensaje(data.message || "Formulario enviado correctamente");
+    
+    // Reset form for next inspection
+    setFormData({
+      fecha: "", horaInicio: "", horaFin: "",
+      division: "", area: "", zona: "", equipo: "",
+      observaciones: "", tecnicos: {}
+    });
+    setCategoria("");
+    setUbicacionFisica("");
+    setPreguntas([]);
+    
+  } catch (error) {
+    console.error(error);
+    setMensaje("Error al enviar");
+  }
+};
+```
+
+### Payload Structure
+
+```json
+{
+  "fecha": "2026-03-06",
+  "horaInicio": "09:15:30",
+  "horaFin": "09:28:45",
+  "division": "1",
+  "area": "2",
+  "zona": "3",
+  "equipo": "45",
+  "observaciones": "Equipment running normally, minor oil leak detected on seal",
+  "usuario": "john.smith",
+  "tecnicos": {
+    "Check oil level": "OK",
+    "Inspect belts for wear": "NOK",
+    "Verify pressure gauges": "OK",
+    "Check for leaks": "NOK",
+    "Test emergency stop": "OK"
+  }
+}
+```
+
+<Info>
+The `tecnicos` object contains all inspection responses, with question descriptions as keys and status values (OK/NOK/NA) as values.
+</Info>
+
+---
+
+## User Interface Features
+
+### Responsive Design
+
+The application uses responsive CSS with mobile-first approach:
+
+```css
+.container {
+  max-width: 850px;
+  margin: 1rem auto;
+  background: #fff;
+  padding: 1.2rem;
+  border-radius: 12px;
+  font-family: "Segoe UI", sans-serif;
+  color: #1a1a1a;
+  border: 3px solid #FFD200;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.08);
+}
+```
+
+### Branding Elements
+
+- **Logo Display**: Goodyear logo prominently featured
+- **Brand Colors**: #003399 (blue) and #FFD200 (yellow)
+- **Custom Styling**: Consistent color scheme throughout interface
+
+### Top Bar Components
+
+```javascript
+<div className="top-bar">
+  <div className="usuario-label">
+    Usuario: {usuarioActual}
+  </div>
+  <button onClick={handleLogout} className="logout-button">
+    Cerrar Sesión
+  </button>
+</div>
+```
+
+Features:
+- Current user display
+- Logout button with hover effects
+- Aligned to the right for easy access
+
+---
+
+## API Integration
+
+### Endpoints
+
+The application integrates with the following API endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/divisiones/` | GET | Fetch all divisions |
+| `/api/areas/` | GET | Fetch all areas |
+| `/api/zonas/` | GET | Fetch all zones |
+| `/api/equipos/` | GET | Fetch all equipment |
+| `/api/preguntas/{categoria}/` | GET | Fetch questions for category |
+| `/api/guardar/` | POST | Submit inspection form |
+
+### Error Handling
+
+```javascript
+// Graceful degradation with empty arrays
+Promise.all([
+  fetch(`${apiUrl}/api/divisiones/`)
+    .then(res => res.json())
+    .catch(() => []),  // Return empty array on failure
+  // ... other endpoints
+]).then(([divs, areas, zonas, equipos]) => {
+  setDivisiones(divs);
+  setAreas(areas);
+  setZonas(zonas);
+  setEquipos(equipos);
+});
+```
+
+<Tip>
+The application implements graceful error handling, returning empty arrays when API calls fail to prevent UI crashes.
+</Tip>
+
+---
+
+## Loading States
+
+The application uses React Suspense for loading state management:
+
+```javascript
+export default function InspeccionPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        textAlign: "center",
+        paddingTop: "2rem",
+        color: "#003399"
+      }}>
+        Cargando formulario...
+      </div>
+    }>
+      <FormularioInspeccion />
+    </Suspense>
+  );
+}
+```
+
+### Client-Side Rendering
+
+The form uses client-side rendering with a loading placeholder:
+
+```html
+<div style="text-align:center;padding-top:2rem;color:#003399">
+  Cargando formulario...
+</div>
+```
+
+---
+
+## Internationalization
+
+The application is built in Spanish (language: "es"):
+
+- All UI text in Spanish
+- Field labels in Spanish
+- Status messages in Spanish
+- Button text in Spanish
+
+<Note>
+The codebase is currently monolingual (Spanish). Internationalization would require implementing i18n libraries like `next-intl` or `react-i18next`.
+</Note>
+
+---
+
+## Technical Stack
+
+<CardGroup cols={3}>
+  <Card title="Next.js" icon="react">
+    React framework with App Router
+  </Card>
+  <Card title="React Hooks" icon="hook">
+    useState, useEffect, Suspense
+  </Card>
+  <Card title="Styled JSX" icon="paintbrush">
+    Component-scoped CSS styling
+  </Card>
+  <Card title="Fetch API" icon="cloud">
+    RESTful API communication
+  </Card>
+  <Card title="LocalStorage" icon="database">
+    Client-side session persistence
+  </Card>
+  <Card title="URL Search Params" icon="link">
+    Query parameter handling
+  </Card>
+</CardGroup>
+
+---
+
+## Key Benefits
+
+### For Technicians
+- ✅ Streamlined inspection workflow
+- ✅ No manual equipment lookup required
+- ✅ Clear checklist format prevents missed items
+- ✅ Quick form submission with minimal typing
+
+### For Management
+- ✅ Standardized inspection data format
+- ✅ Automatic timestamp capture for compliance
+- ✅ User accountability through login system
+- ✅ Comprehensive audit trail
+
+### For Operations
+- ✅ Real-time data submission
+- ✅ Equipment-specific question sets
+- ✅ Reduced training time (intuitive interface)
+- ✅ Mobile-friendly for shop floor use
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/getting-started/installation">
+    Learn how to deploy and configure the application
+  </Card>
+  <Card title="Technical Reference" icon="code" href="/technical/api-integration">
+    Explore the backend API endpoints and data models
+  </Card>
+  <Card title="User Guide" icon="book" href="/user-guide/authentication">
+    Step-by-step instructions for conducting inspections
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/support/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

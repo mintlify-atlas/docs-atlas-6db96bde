@@ -1,0 +1,361 @@
+---
+title: Troubleshooting Guide
+description: Solutions to common issues and errors in the Production Inspection Form system
+---
+
+# Troubleshooting Guide
+
+This guide helps you resolve common issues with the Production Inspection Form application.
+
+## Login Issues
+
+### Invalid Credentials Error
+
+**Problem**: Message "Credenciales inválidas" appears after login attempt.
+
+<Warning>
+  This error indicates the LDAP server rejected your username or password.
+</Warning>
+
+**Solutions**:
+1. Verify you're using your network credentials (not application-specific credentials)
+2. Check for typos in username and password
+3. Ensure CAPS LOCK is not enabled
+4. Try logging into another network resource to verify your credentials work
+5. Contact IT support if your account may be locked or expired
+
+### Login Error or Connection Failed
+
+**Problem**: Message "Error al iniciar sesión" appears.
+
+**Cause**: Network connectivity issue or API server is unavailable.
+
+**Solutions**:
+1. Check your network connection
+2. Verify the API server `http://10.107.194.110/insp/` is accessible:
+   ```bash
+   ping 10.107.194.110
+   ```
+3. Check browser console (F12) for detailed error messages
+4. Try refreshing the page and logging in again
+5. If persistent, contact system administrator
+
+<Info>
+  The login endpoint is: `POST http://10.107.194.110/insp/api/login-ldap/`
+</Info>
+
+### Redirect Loop or Cannot Stay Logged In
+
+**Problem**: You're repeatedly redirected to login page even after successful authentication.
+
+**Cause**: LocalStorage is not functioning or being cleared.
+
+**Solutions**:
+1. Check browser localStorage:
+   - Open Developer Tools (F12)
+   - Go to Application/Storage tab
+   - Check localStorage for `usuario_inspeccion` key
+2. Ensure browser is not in private/incognito mode
+3. Check browser settings allow localStorage for this domain
+4. Try a different browser to rule out browser-specific issues
+5. Clear all cookies and cache, then try logging in again
+
+<Note>
+  The application stores two localStorage items:
+  - `usuario_inspeccion`: Your username
+  - `usuario_nombre`: Your full name
+</Note>
+
+## Form Loading Issues
+
+### Form Stuck on "Cargando formulario..."
+
+**Problem**: The loading message never goes away.
+
+**Cause**: One or more API endpoints are not responding.
+
+**Solutions**:
+1. Check browser console (F12) for network errors
+2. Verify API endpoints are accessible:
+   - `/api/divisiones/`
+   - `/api/areas/`
+   - `/api/zonas/`
+   - `/api/equipos/`
+3. Check network connectivity to `http://10.107.194.110/insp/`
+4. Wait 30 seconds for timeout, then refresh the page
+5. Contact system administrator if server is down
+
+<Warning>
+  The form requires all four initial API calls to succeed. If any fail, the form may not render properly.
+</Warning>
+
+### Equipment Not Pre-Selected from URL
+
+**Problem**: Equipment ID passed in URL parameter is not being selected.
+
+**Example**: `/?equipo=123` doesn't populate the form
+
+**Solutions**:
+1. Verify the URL parameter format is correct: `?equipo=123`
+2. Check browser console for "Error cargando equipo" message
+3. Verify the equipment ID exists in the database
+4. Ensure the `/api/equipos/` endpoint returns valid data
+5. Check that the equipment ID is a valid number
+
+### Inspection Questions Not Loading
+
+**Problem**: The inspection checklist table is empty or not displaying.
+
+**Cause**: Equipment category is missing or questions API failed.
+
+**Solutions**:
+1. Verify equipment has a valid `categoria` field
+2. Check console for "Error cargando preguntas" message
+3. Verify the endpoint `/api/preguntas/{categoria}/` is accessible
+4. Ensure the category exists in the database
+5. Try selecting a different equipment to test
+
+<Info>
+  Questions are loaded dynamically based on equipment category. No category = no questions.
+</Info>
+
+## Form Submission Issues
+
+### "Error al enviar" Message
+
+**Problem**: Submission fails with generic error message.
+
+**Cause**: Network issue or API server error.
+
+**Solutions**:
+1. Check browser console for detailed error:
+   ```javascript
+   console.error(e) // Look for fetch or network errors
+   ```
+2. Verify the `/api/guardar/` endpoint is accessible
+3. Check that all required fields are filled
+4. Verify your localStorage still contains `usuario_inspeccion`
+5. Try submitting again after a few seconds
+6. Check with administrator if API server is having issues
+
+<Warning>
+  If submission fails, your data is NOT saved. You'll need to submit again.
+</Warning>
+
+### Form Doesn't Submit / No Response
+
+**Problem**: Clicking "Enviar" does nothing.
+
+**Solutions**:
+1. Check if you're still logged in (username shown in top-right?)
+2. Verify `usuario_inspeccion` exists in localStorage
+3. Check browser console for JavaScript errors
+4. Ensure at least one inspection question is answered
+5. Try refreshing the page and re-entering data
+
+### Data Not Resetting After Submission
+
+**Problem**: Form doesn't clear after successful submission.
+
+**Expected behavior**: After successful submit, form should:
+- Clear all input fields
+- Reset técnicos responses
+- Clear ubicación and categoría
+- Empty the inspection questions array
+
+**Solutions**:
+1. This indicates submission may have failed - check for success message
+2. Look for server response in Network tab (F12)
+3. Manually refresh the page to start fresh
+4. Report to administrator if issue persists
+
+## LocalStorage Issues
+
+### Lost Session After Page Refresh
+
+**Problem**: You're logged out after refreshing or closing the browser.
+
+**Solutions**:
+1. Check if browser is clearing localStorage on exit
+2. Verify browser is not in private/incognito mode
+3. Check browser privacy settings
+4. Ensure no browser extensions are clearing storage
+5. Try a different browser
+
+### Wrong Username Displayed
+
+**Problem**: Top-right shows incorrect username.
+
+**Cause**: Stale data in localStorage.
+
+**Solutions**:
+1. Click "Cerrar Sesión" to logout
+2. Clear localStorage manually:
+   - Open Developer Tools (F12)
+   - Go to Application → Local Storage
+   - Delete `usuario_inspeccion` and `usuario_nombre`
+3. Log in again with correct credentials
+
+<Note>
+  The displayed username comes from `localStorage.getItem('usuario_inspeccion')`
+</Note>
+
+## Browser Compatibility Issues
+
+### Styles Not Loading / Broken Layout
+
+**Problem**: Form appears unstyled or broken.
+
+**Solutions**:
+1. Verify CSS file is loading:
+   ```
+   /insp_pry/inspecciones/_next/static/css/44789b9e843c94e2.css
+   ```
+2. Clear browser cache (Ctrl+Shift+Delete)
+3. Hard reload page (Ctrl+Shift+R)
+4. Check browser console for 404 errors on CSS files
+5. Try a different browser
+
+### JavaScript Errors
+
+**Problem**: Form not interactive or components not working.
+
+**Solutions**:
+1. Check browser console (F12) for JavaScript errors
+2. Verify all chunk files are loading:
+   - `webpack-*.js`
+   - `main-app-*.js`
+   - Page-specific chunks
+3. Clear browser cache and reload
+4. Disable browser extensions that might interfere
+5. Try a different browser (Chrome, Firefox, Edge recommended)
+
+### Mobile Display Issues
+
+**Problem**: Form not responsive on mobile devices.
+
+**Solutions**:
+1. Check viewport meta tag is present:
+   ```html
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   ```
+2. Rotate device to landscape for better table visibility
+3. Use table horizontal scroll for inspection checklist
+4. Try using desktop mode in mobile browser settings
+5. Use a tablet or desktop for better experience
+
+<Info>
+  The inspection table has `overflow-x: auto` for horizontal scrolling on small screens.
+</Info>
+
+## Network and API Troubleshooting
+
+### All API Calls Failing
+
+**Problem**: Nothing loads, multiple console errors.
+
+**Cause**: Cannot reach API server.
+
+**Solutions**:
+1. Verify network connection
+2. Test API server accessibility:
+   ```bash
+   curl http://10.107.194.110/insp/api/divisiones/
+   ```
+3. Check firewall settings
+4. Verify you're on the correct network (VPN if remote)
+5. Contact network administrator
+
+<Warning>
+  Base API URL: `http://10.107.194.110/insp/`
+  
+  All endpoints are relative to this base URL.
+</Warning>
+
+### CORS or Mixed Content Errors
+
+**Problem**: Browser blocks API requests with CORS or security errors.
+
+**Solutions**:
+1. Verify application and API are on same protocol (both HTTP or both HTTPS)
+2. Check API server CORS configuration
+3. Ensure API allows requests from your domain
+4. Contact system administrator to configure CORS headers
+
+### Intermittent Connection Failures
+
+**Problem**: Some API calls work, others fail randomly.
+
+**Solutions**:
+1. Check network stability
+2. Verify API server is not overloaded
+3. Look for timeout errors in console
+4. Try during off-peak hours
+5. Report pattern to system administrator
+
+## Advanced Debugging
+
+### Using Browser DevTools
+
+<Accordion title="How to check Network requests">
+  1. Open Developer Tools (F12)
+  2. Go to Network tab
+  3. Reload the page
+  4. Look for API requests to `10.107.194.110`
+  5. Check status codes:
+     - 200: Success
+     - 401: Unauthorized
+     - 404: Not found
+     - 500: Server error
+  6. Click on request to see request/response details
+</Accordion>
+
+<Accordion title="How to check LocalStorage">
+  1. Open Developer Tools (F12)
+  2. Go to Application tab (Chrome) or Storage tab (Firefox)
+  3. Expand Local Storage in left sidebar
+  4. Select your domain
+  5. Look for:
+     - `usuario_inspeccion`
+     - `usuario_nombre`
+     - `redirect_after_login`
+</Accordion>
+
+<Accordion title="How to check Console errors">
+  1. Open Developer Tools (F12)
+  2. Go to Console tab
+  3. Look for red error messages
+  4. Common errors to look for:
+     - `Error cargando preguntas`
+     - `Error cargando equipo`
+     - `Error al enviar`
+     - `Error al iniciar sesión`
+     - Network/fetch errors
+  5. Copy error message for support team
+</Accordion>
+
+### Common Console Error Messages
+
+| Error Message | Meaning | Solution |
+|---------------|---------|----------|
+| `Error cargando preguntas` | Questions API failed | Check equipment category and API endpoint |
+| `Error cargando equipo` | Equipment API failed | Verify equipment ID and API endpoint |
+| `Error al enviar` | Form submission failed | Check network and `/api/guardar/` endpoint |
+| `Error al iniciar sesión` | Login API failed | Check credentials and network |
+| `Credenciales inválidas` | Wrong username/password | Verify LDAP credentials |
+| `Formulario enviado correctamente` | Success! | This is a success message |
+
+## Getting Additional Help
+
+<Info>
+  If you continue to experience issues after trying these solutions:
+  
+  1. Note the exact error message
+  2. Check browser console for technical details
+  3. Document the steps to reproduce the issue
+  4. Contact your system administrator with:
+     - Error message
+     - Browser and version
+     - Network details
+     - Console error logs
+</Info>

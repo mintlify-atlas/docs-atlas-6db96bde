@@ -1,0 +1,174 @@
+---
+title: Frequently Asked Questions
+description: Common questions and answers about using the Production Inspection Form system
+---
+
+# Frequently Asked Questions
+
+Find answers to the most common questions about the Production Inspection Form application.
+
+## Login and Authentication
+
+<Accordion title="How do I log in to the inspection form?">
+  Navigate to the login page and enter your LDAP credentials:
+  - **Usuario**: Your network username
+  - **Contraseña**: Your network password
+  
+  The system authenticates against the LDAP server at `http://10.107.194.110/insp/api/login-ldap/`.
+</Accordion>
+
+<Accordion title="What happens if I enter incorrect credentials?">
+  If your credentials are invalid, you'll see an error message "Credenciales inválidas" below the login form. Double-check your username and password and try again.
+</Accordion>
+
+<Accordion title="Where does the system redirect me after login?">
+  After successful login:
+  - The system stores your username in `localStorage` as `usuario_inspeccion`
+  - Your full name (first and last name) is stored as `usuario_nombre`
+  - You're redirected to the inspection form, or to the page stored in `redirect_after_login` if you were redirected to login from another page
+</Accordion>
+
+<Accordion title="How does the system remember my login state?">
+  The application uses browser `localStorage` to maintain your session:
+  - `usuario_inspeccion`: Your username
+  - `usuario_nombre`: Your full name
+  
+  This data persists until you log out or clear your browser storage.
+</Accordion>
+
+## Using the Inspection Form
+
+<Accordion title="How do I start a new inspection?">
+  Once logged in:
+  1. The form automatically populates the current **fecha** (date) and **horaInicio** (start time)
+  2. Select or verify the equipment information (División, Área, Zona, Equipo)
+  3. The system loads the appropriate inspection questions based on the equipment category
+  4. Fill out the inspection checklist and observations
+  5. Click **Enviar** to submit
+</Accordion>
+
+<Accordion title="Can I pre-select equipment using a URL parameter?">
+  Yes! You can pass an equipment ID in the URL:
+  ```
+  http://your-domain/insp_pry/inspecciones/?equipo=123
+  ```
+  
+  The system will:
+  - Automatically select that equipment
+  - Load the associated División, Área, and Zona
+  - Display the Ubicación Física and Categoría
+  - Load the appropriate inspection questions for that equipment category
+</Accordion>
+
+<Accordion title="What are the three inspection response options?">
+  For each inspection item, you can select:
+  - **OK**: Item passes inspection
+  - **NOK**: Item fails inspection (not OK)
+  - **No aplica**: Item is not applicable to this equipment
+</Accordion>
+
+<Accordion title="Are the División, Área, Zona, and Equipo fields editable?">
+  No, these fields are disabled (read-only) in the form. They are automatically populated based on:
+  - The equipment selected via URL parameter, OR
+  - Data loaded from the API endpoints
+</Accordion>
+
+<Accordion title="What information is automatically captured when I submit?">
+  The form automatically includes:
+  - **horaFin**: End time (captured at submission)
+  - **usuario**: Your username from localStorage
+  - All form data including División, Área, Zona, Equipo
+  - Inspection responses (técnicos object)
+  - Observaciones (observations)
+</Accordion>
+
+## Data and API
+
+<Accordion title="Where is my inspection data submitted?">
+  Form data is sent to:
+  ```
+  POST http://10.107.194.110/insp/api/guardar/
+  ```
+  
+  The submission includes all form fields as JSON, and the server responds with a confirmation message.
+</Accordion>
+
+<Accordion title="What API endpoints does the application use?">
+  The application loads data from these endpoints:
+  - `/api/divisiones/` - Division list
+  - `/api/areas/` - Area list
+  - `/api/zonas/` - Zone list
+  - `/api/equipos/` - Equipment list
+  - `/api/preguntas/{categoria}/` - Inspection questions for a specific category
+  - `/api/login-ldap/` - LDAP authentication
+  - `/api/guardar/` - Save inspection form
+</Accordion>
+
+<Accordion title="How are inspection questions loaded?">
+  Inspection questions are dynamically loaded based on the equipment's category:
+  1. Equipment is selected (via URL or form)
+  2. System fetches equipment details from `/api/equipos/`
+  3. Equipment's `categoria` field is extracted
+  4. Questions are loaded from `/api/preguntas/{categoria}/`
+  5. A table is rendered with each question and OK/NOK/NA radio buttons
+</Accordion>
+
+<Accordion title="What happens if the API calls fail?">
+  The application includes error handling:
+  - Failed API calls return empty arrays `[]` as fallback
+  - Console errors are logged for debugging
+  - Specific error messages like "Error cargando preguntas" or "Error cargando equipo" appear in console
+  - Form submission errors display "Error al enviar" below the form
+</Accordion>
+
+## Browser and Storage
+
+<Accordion title="What happens when I click Cerrar Sesión (logout)?">
+  The logout button:
+  - Removes `usuario_inspeccion` from localStorage
+  - Redirects you to `/login`
+  - Clears your session data
+</Accordion>
+
+<Accordion title="What if I clear my browser data?">
+  Clearing browser data will:
+  - Remove your stored username and session
+  - Require you to log in again
+  - Not affect submitted inspection data (stored on server)
+</Accordion>
+
+<Accordion title="Can I use this application on mobile devices?">
+  Yes, the application is responsive with:
+  - `viewport` meta tag set to `width=device-width, initial-scale=1.0`
+  - Mobile-friendly form inputs and styling
+  - Table overflow handling with `overflow-x:auto` for the inspection checklist
+</Accordion>
+
+## Form Behavior
+
+<Accordion title="What happens after I successfully submit a form?">
+  On successful submission:
+  1. A status message appears: "Formulario enviado correctamente" (or custom server message)
+  2. All form fields are reset to empty values
+  3. Ubicación and Categoría are cleared
+  4. The inspection questions table is cleared
+  5. You can start a new inspection
+</Accordion>
+
+<Accordion title="Can I see my username while filling out the form?">
+  Yes, the top-right corner displays:
+  ```
+  Usuario: [your username]
+  ```
+  
+  This confirms you're logged in and shows whose name will be associated with the inspection.
+</Accordion>
+
+<Accordion title="Is there a loading state while the form initializes?">
+  Yes, while the form loads you'll see:
+  ```
+  Cargando formulario...
+  ```
+  
+  This appears until all initial data (divisiones, areas, zonas, equipos) is loaded from the API.
+</Accordion>

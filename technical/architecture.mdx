@@ -1,0 +1,322 @@
+---
+title: 'Architecture Overview'
+description: 'Technical architecture of the Production Inspection Form system'
+---
+
+## Application Architecture
+
+The Production Inspection Form is built as a **Next.js 13+ client-side application** using the App Router architecture with React 18 features.
+
+### Technology Stack
+
+- **Framework**: Next.js 13+ (App Router)
+- **UI Library**: React 18
+- **Styling**: Styled JSX (CSS-in-JS)
+- **Routing**: Next.js App Router with `useRouter` and `useSearchParams`
+- **State Management**: React Hooks (useState, useEffect)
+- **Data Fetching**: Native Fetch API
+
+## Project Structure
+
+```
+app/
+├── page.js              # Main inspection form (client component)
+├── login/
+│   └── page.js          # Login page (client component)
+├── _not-found/
+│   └── page.js          # 404 error page
+└── layout.js            # Root layout
+```
+
+### Component Architecture
+
+The application follows a client-side rendering approach with two main pages:
+
+#### Main Inspection Form (`page.js`)
+
+Location: `_next/static/chunks/app/page-827516494aef3be9.js`
+
+<Info>
+The main form component is wrapped in `React.Suspense` for improved loading states and code splitting.
+</Info>
+
+```javascript
+function InspectionForm() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [apiUrl, setApiUrl] = useState(null);
+  const [formData, setFormData] = useState({
+    fecha: "",
+    horaInicio: "",
+    horaFin: "",
+    division: "",
+    area: "",
+    zona: "",
+    equipo: "",
+    observaciones: "",
+    tecnicos: {}
+  });
+  
+  // Additional state for dropdowns and equipment details
+  const [usuario, setUsuario] = useState("");
+  const [divisiones, setDivisiones] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [zonas, setZonas] = useState([]);
+  const [equipos, setEquipos] = useState([]);
+  const [categoria, setCategoria] = useState("");
+  const [ubicacion, setUbicacion] = useState("");
+  const [preguntas, setPreguntas] = useState([]);
+  const [statusMessage, setStatusMessage] = useState("");
+  
+  // Component logic...
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Cargando formulario...</div>}>
+      <InspectionForm />
+    </Suspense>
+  );
+}
+```
+
+#### Login Page (`login/page.js`)
+
+Location: `_next/static/chunks/app/login/page-1bf3318933cd0a50.js`
+
+```javascript
+function LoginPage() {
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // LDAP authentication logic
+  };
+  
+  return (
+    <main className="login-container">
+      <h2>Iniciar Sesión</h2>
+      <form onSubmit={handleSubmit}>
+        {/* Form fields */}
+      </form>
+    </main>
+  );
+}
+```
+
+## React Hooks Usage
+
+The application extensively uses React hooks for state management and side effects:
+
+### useState Hook
+
+```javascript
+// Form data state
+const [formData, setFormData] = useState({
+  fecha: "",
+  horaInicio: "",
+  horaFin: "",
+  division: "",
+  area: "",
+  zona: "",
+  equipo: "",
+  observaciones: "",
+  tecnicos: {}
+});
+
+// Dropdown data states
+const [divisiones, setDivisiones] = useState([]);
+const [areas, setAreas] = useState([]);
+const [zonas, setZonas] = useState([]);
+const [equipos, setEquipos] = useState([]);
+
+// Equipment details
+const [categoria, setCategoria] = useState("");
+const [ubicacion, setUbicacion] = useState("");
+const [preguntas, setPreguntas] = useState([]);
+```
+
+### useEffect Hook
+
+The application uses three main `useEffect` hooks:
+
+#### 1. Mount Effect
+
+```javascript
+useEffect(() => {
+  setMounted(true);
+}, []);
+```
+
+<Note>
+This ensures the component has mounted before rendering, preventing hydration mismatches.
+</Note>
+
+#### 2. Authentication & API URL Setup
+
+```javascript
+useEffect(() => {
+  const usuario = localStorage.getItem("usuario_inspeccion");
+  const nombreUsuario = localStorage.getItem("usuario_nombre");
+  
+  if (usuario) {
+    setUsuario(nombreUsuario || usuario);
+  } else {
+    const currentUrl = window.location.href;
+    localStorage.setItem("redirect_after_login", currentUrl);
+    router.push("/login");
+  }
+  
+  setApiUrl("http://10.107.194.110/insp/");
+}, []);
+```
+
+#### 3. Data Loading Effect
+
+```javascript
+useEffect(() => {
+  if (!apiUrl) return;
+  
+  // Set initial date and time
+  const now = new Date();
+  const timeString = now.toTimeString().split(" ")[0];
+  setFormData(prev => ({
+    ...prev,
+    fecha: now.toISOString().split("T")[0],
+    horaInicio: timeString
+  }));
+  
+  // Load all catalog data in parallel
+  Promise.all([
+    fetch(`${apiUrl}/api/divisiones/`).then(r => r.json()).catch(() => []),
+    fetch(`${apiUrl}/api/areas/`).then(r => r.json()).catch(() => []),
+    fetch(`${apiUrl}/api/zonas/`).then(r => r.json()).catch(() => []),
+    fetch(`${apiUrl}/api/equipos/`).then(r => r.json()).catch(() => [])
+  ]).then(([divs, ars, zns, eqs]) => {
+    setDivisiones(divs);
+    setAreas(ars);
+    setZonas(zns);
+    setEquipos(eqs);
+  });
+  
+  // Load equipment from URL parameter
+  const equipoId = searchParams.get("equipo");
+  if (equipoId) {
+    // Load equipment details and questions
+  }
+}, [apiUrl]);
+```
+
+<Warning>
+The API URL is hardcoded in the source code. For production deployments, this should be moved to environment variables.
+</Warning>
+
+### useRouter & useSearchParams Hooks
+
+```javascript
+const router = useRouter();
+const searchParams = useSearchParams();
+
+// Navigation
+router.push("/login");
+
+// Reading URL parameters
+const equipoId = searchParams.get("equipo");
+```
+
+## Rendering Strategy
+
+### Client-Side Rendering (CSR)
+
+The application uses **client-side rendering** exclusively:
+
+- All components are client components (no Server Components)
+- Data fetching happens in the browser via `useEffect`
+- Authentication is handled client-side using `localStorage`
+- Form submissions use client-side fetch calls
+
+### Hydration Protection
+
+```javascript
+const [mounted, setMounted] = useState(false);
+
+useEffect(() => {
+  setMounted(true);
+}, []);
+
+return mounted ? (
+  // Render content
+) : null;
+```
+
+<Info>
+The `mounted` state prevents hydration mismatches by ensuring client-only code runs after initial mount.
+</Info>
+
+## Styling Architecture
+
+The application uses **Styled JSX** for component-scoped CSS:
+
+```javascript
+import Style from 'styled-jsx/style';
+
+return (
+  <main className="jsx-8e61cfe740c0e4d1 container">
+    {/* Content */}
+    <Style id="8e61cfe740c0e4d1">{`
+      .container {
+        max-width: 850px;
+        margin: 1rem auto;
+        background: #fff;
+        padding: 1.2rem;
+        border-radius: 12px;
+        border: 3px solid #FFD200;
+      }
+    `}</Style>
+  </main>
+);
+```
+
+### CSS Optimization
+
+Styled JSX provides:
+- **Scoped styles**: CSS classes are automatically scoped to components
+- **Zero runtime overhead**: Styles are extracted at build time
+- **Critical CSS**: Automatically inlined for initial page load
+
+## Build Output
+
+The Next.js build produces optimized chunks:
+
+```
+_next/static/chunks/app/
+├── page-827516494aef3be9.js        # Main form (17.9 KB)
+├── login/page-1bf3318933cd0a50.js # Login page
+└── layout-47f7f4a020effbab.js      # Root layout
+```
+
+<Note>
+Webpack chunks are code-split for optimal loading performance. Each route loads only the JavaScript it needs.
+</Note>
+
+## Performance Considerations
+
+1. **Code Splitting**: Each route is automatically code-split
+2. **Suspense Boundaries**: Main form wrapped in Suspense for loading states
+3. **Parallel Data Loading**: Uses `Promise.all()` to load catalog data
+4. **Memoization**: Form state updates use functional setState for optimal re-renders
+
+## Security Architecture
+
+- **LDAP Authentication**: Login uses server-side LDAP validation
+- **Session Storage**: User credentials stored in `localStorage`
+- **Protected Routes**: Automatic redirect to login for unauthenticated users
+- **CSP Support**: Styled JSX supports Content Security Policy with nonce
+
+<Warning>
+Storing session data in localStorage is not recommended for production. Consider using secure HTTP-only cookies or server-side sessions.
+</Warning>

@@ -1,0 +1,243 @@
+---
+title: 'Inspection Form'
+description: 'Complete guide to filling out the technical inspection form'
+---
+
+# Inspection Form
+
+The main inspection form ("Formulario de Inspección Técnica") is the core interface for recording equipment inspections. This page guides you through each section of the form.
+
+## Form Overview
+
+The inspection form is divided into several sections:
+
+1. **Basic Information**: Date and time fields
+2. **Equipment Selection**: Division, area, zone, and equipment hierarchy
+3. **Technical Questions**: Inspection checklist with OK/NOK/NA options
+4. **Observations**: Additional notes and comments
+5. **Submission**: Send the completed inspection
+
+<Note>
+  The form automatically loads when you're logged in. If you see "Cargando formulario..." (Loading form...), wait a moment for all data to load from the API.
+</Note>
+
+## Header Section
+
+At the top of the form, you'll see:
+
+- **Goodyear Logo**: Company branding
+- **Form Title**: "Formulario de Inspección Técnica"
+- **User Bar**: Shows "Usuario: [your name]" and the **Cerrar Sesión** (Logout) button
+
+## Basic Information Fields
+
+### Fecha (Date)
+
+The date field is automatically populated with today's date when the form loads.
+
+- **Field type**: Date picker
+- **Auto-filled**: Yes (current date)
+- **Editable**: Yes, you can change it if needed
+- **Format**: YYYY-MM-DD (ISO format)
+
+### Hora de Inicio (Start Time)
+
+The start time is automatically populated with the current time when the form loads.
+
+- **Field type**: Text input
+- **Auto-filled**: Yes (current time)
+- **Format**: HH:MM:SS (24-hour format)
+- **Editable**: Yes
+
+<Info>
+  The start time represents when you begin the inspection. The system captures this automatically, but you can adjust it if you started the inspection at a different time.
+</Info>
+
+### Hora de Fin (End Time)
+
+This field is typically filled manually when you complete the inspection.
+
+- **Field type**: Text input (implied from state management)
+- **Auto-filled**: No
+- **Format**: HH:MM:SS (24-hour format)
+
+## Equipment Selection Fields
+
+These fields form a hierarchical selection system. See [Equipment Selection](/user-guide/equipment-selection) for detailed information.
+
+### División (Division)
+
+- **Field type**: Dropdown select
+- **Data source**: Loaded from `/api/divisiones/`
+- **Required**: Yes
+- **Effect**: Filters available areas
+
+### Área (Area)
+
+- **Field type**: Dropdown select
+- **Data source**: Loaded from `/api/areas/`
+- **Filtered by**: Selected division
+- **Required**: Yes
+- **Effect**: Filters available zones
+
+### Zona (Zone)
+
+- **Field type**: Dropdown select
+- **Data source**: Loaded from `/api/zonas/`
+- **Filtered by**: Selected area
+- **Required**: Yes
+- **Effect**: Filters available equipment
+
+### Equipo (Equipment)
+
+- **Field type**: Dropdown select
+- **Data source**: Loaded from `/api/equipos/`
+- **Filtered by**: Selected zone
+- **Required**: Yes
+- **Effect**: Loads equipment-specific details and questions
+
+<Warning>
+  You must select Division, Area, and Zone before you can select specific Equipment. The selections are hierarchical and interdependent.
+</Warning>
+
+## Equipment Details (Auto-filled)
+
+Once you select equipment, these fields are automatically populated:
+
+### Ubicación Física (Physical Location)
+
+- **Field type**: Text input (read-only display)
+- **Auto-filled**: Yes, from equipment data
+- **Shows**: The physical location of the selected equipment
+
+### Categoría del Equipo (Equipment Category)
+
+- **Field type**: Text input (read-only display)
+- **Auto-filled**: Yes, from equipment data
+- **Effect**: Determines which technical questions are loaded
+
+<Note>
+  Equipment category is critical because it determines the specific inspection checklist that appears in the Technical Questions table.
+</Note>
+
+## Technical Questions Table
+
+This section displays the inspection checklist specific to the selected equipment category.
+
+### Table Structure
+
+The table ("tabla-tecnica") has the following columns:
+
+| Column | Description |
+|--------|-------------|
+| **Inspección** | The inspection question/item |
+| **OK** | Equipment passes this check |
+| **NOK** | Equipment fails this check |
+| **No aplica** | This check doesn't apply |
+
+### Answering Questions
+
+<Steps>
+  <Step title="Review the Question">
+    Each row contains a specific inspection item relevant to the equipment category.
+  </Step>
+  
+  <Step title="Select Your Answer">
+    For each question, select one of three radio button options:
+    
+    - **OK**: The item is functioning correctly or meets requirements
+    - **NOK**: The item has issues or doesn't meet requirements  
+    - **NA** (No aplica): This inspection item doesn't apply to this specific equipment
+    
+    <Info>
+      Radio buttons ensure you can only select one answer per question. Selecting a new option will automatically deselect the previous choice.
+    </Info>
+  </Step>
+  
+  <Step title="Complete All Questions">
+    Go through each row and provide an answer. The form tracks responses with IDs like `pregunta-[id]`.
+  </Step>
+</Steps>
+
+### Dynamic Question Loading
+
+Questions are loaded dynamically based on equipment category:
+
+1. When you select equipment, the system reads its `categoria` value
+2. It fetches questions from `/api/preguntas/[categoria]/`
+3. The table populates with category-specific inspection items
+4. If the API call fails, you'll see a console error: "Error cargando preguntas"
+
+<Warning>
+  If questions don't load, verify that:
+  - You've selected an equipment item
+  - The equipment has a valid category assigned
+  - Your network connection is stable
+</Warning>
+
+## Observaciones (Observations)
+
+The observations field allows you to add additional notes, comments, or details about the inspection.
+
+- **Field type**: Textarea (multi-line text)
+- **Required**: No
+- **Purpose**: Document any issues, special circumstances, or additional information
+- **Character limit**: Not specified in the UI
+
+<Info>
+  Use the Observaciones field to:
+  - Explain NOK (failed) items in detail
+  - Note temporary conditions
+  - Record follow-up actions needed
+  - Add context that doesn't fit in the checklist
+</Info>
+
+## Form Validation
+
+Before you can submit the form, certain validations must pass:
+
+### Required Fields
+
+- Fecha (Date)
+- Hora de Inicio (Start Time)  
+- División (Division)
+- Área (Area)
+- Zona (Zone)
+- Equipo (Equipment)
+
+### Technical Questions
+
+While the system tracks responses with a `tecnicos` object structure, the specific validation rules for question completion aren't explicitly shown in the UI.
+
+<Note>
+  It's best practice to answer all technical questions, even if some are marked as "NA" (No aplica).
+</Note>
+
+## URL Parameters
+
+The form supports pre-filling equipment via URL parameter:
+
+- **Parameter**: `?equipo=[equipment_id]`
+- **Example**: `https://your-site.com/?equipo=123`
+- **Effect**: Automatically selects the specified equipment and loads its division, area, zone, and questions
+
+<Info>
+  This feature is useful for:
+  - QR codes on equipment
+  - Links from equipment management systems
+  - Bookmarking frequently inspected equipment
+</Info>
+
+## Status Messages
+
+The form displays status messages (with class `status`) at the bottom to provide feedback:
+
+- Loading states: "Cargando formulario..."
+- Submission status: See [Submitting Inspections](/user-guide/submitting-inspections)
+
+## Next Steps
+
+Once you've filled out the form:
+
+- Learn more about [Equipment Selection](/user-guide/equipment-selection)
+- Proceed to [Submit Your Inspection](/user-guide/submitting-inspections)

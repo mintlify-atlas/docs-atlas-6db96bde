@@ -1,0 +1,515 @@
+---
+title: 'Data Model'
+description: 'Data structures and models used in the Production Inspection Form system'
+---
+
+## Form Data Structure
+
+The inspection form uses a comprehensive data model to capture all inspection details.
+
+### Main Form State
+
+```typescript
+interface FormData {
+  fecha: string;           // ISO date format: "2026-03-06"
+  horaInicio: string;      // Time format: "09:30:00"
+  horaFin: string;         // Time format: "10:15:00"
+  division: string;        // Division ID
+  area: string;            // Area ID
+  zona: string;            // Zone ID
+  equipo: string;          // Equipment ID
+  observaciones: string;   // Free-text observations
+  tecnicos: {              // Question responses
+    [pregunta: string]: "OK" | "NOK" | "NA";
+  };
+}
+```
+
+### Form State Implementation
+
+```javascript
+const [formData, setFormData] = useState({
+  fecha: "",
+  horaInicio: "",
+  horaFin: "",
+  division: "",
+  area: "",
+  zona: "",
+  equipo: "",
+  observaciones: "",
+  tecnicos: {}
+});
+```
+
+### Form Data Population
+
+```javascript
+// Initialize date and time on load
+const now = new Date();
+const timeString = now.toTimeString().split(" ")[0];
+
+setFormData(prev => ({
+  ...prev,
+  fecha: now.toISOString().split("T")[0],  // "2026-03-06"
+  horaInicio: timeString                    // "09:30:00"
+}));
+```
+
+<Info>
+The form automatically sets the current date and start time when loaded. End time is calculated on submission.
+</Info>
+
+## Catalog Data Models
+
+### Division Model
+
+```typescript
+interface Division {
+  id: number;      // Unique identifier
+  nombre: string;  // Division name (e.g., "Planta Norte")
+}
+```
+
+**Example**:
+```json
+{
+  "id": 1,
+  "nombre": "Planta Norte"
+}
+```
+
+### Area Model
+
+```typescript
+interface Area {
+  id: number;      // Unique identifier
+  nombre: string;  // Area name (e.g., "Producción", "Mantenimiento")
+}
+```
+
+**Example**:
+```json
+{
+  "id": 2,
+  "nombre": "Mantenimiento"
+}
+```
+
+### Zone Model
+
+```typescript
+interface Zona {
+  id: number;      // Unique identifier
+  nombre: string;  // Zone name (e.g., "Zona A", "Zona B")
+}
+```
+
+**Example**:
+```json
+{
+  "id": 1,
+  "nombre": "Zona A"
+}
+```
+
+### Equipment Model
+
+The equipment model is the most complex, containing hierarchical relationships and metadata.
+
+```typescript
+interface Equipo {
+  id: number;          // Unique identifier
+  nombre: string;      // Equipment name
+  division_id: number; // Foreign key to Division
+  area_id: number;     // Foreign key to Area
+  zona_id: number;     // Foreign key to Zone
+  ubicacion: string;   // Physical location description
+  categoria: string;   // Equipment category (determines questions)
+}
+```
+
+**Example**:
+```json
+{
+  "id": 1,
+  "nombre": "Compresor #1",
+  "division_id": 1,
+  "area_id": 2,
+  "zona_id": 1,
+  "ubicacion": "Edificio A, Nivel 2, Esquina Noroeste",
+  "categoria": "COMPRESOR"
+}
+```
+
+<Note>
+Equipment objects contain denormalized hierarchical data (division_id, area_id, zona_id) for efficient form population.
+</Note>
+
+### Equipment Category Mapping
+
+```javascript
+// When equipment is selected, populate related fields
+const equipo = equipos.find(e => String(e.id) === String(equipoId));
+
+if (equipo) {
+  // Populate hierarchical selects
+  setFormData(prev => ({
+    ...prev,
+    division: equipo.division_id,
+    area: equipo.area_id,
+    zona: equipo.zona_id
+  }));
+  
+  // Set equipment metadata
+  setUbicacion(equipo.ubicacion);
+  setCategoria(equipo.categoria);
+}
+```
+
+## Inspection Questions Model
+
+```typescript
+interface Pregunta {
+  id: number;          // Unique identifier
+  descripcion: string; // Question text
+  categoria: string;   // Equipment category
+  orden?: number;      // Display order (optional)
+}
+```
+
+**Example**:
+```json
+[
+  {
+    "id": 1,
+    "descripcion": "Verificar nivel de aceite",
+    "categoria": "COMPRESOR",
+    "orden": 1
+  },
+  {
+    "id": 2,
+    "descripcion": "Inspeccionar fugas de aire",
+    "categoria": "COMPRESOR",
+    "orden": 2
+  },
+  {
+    "id": 3,
+    "descripcion": "Revisar presión de operación",
+    "categoria": "COMPRESOR",
+    "orden": 3
+  }
+]
+```
+
+### Question Response Model
+
+Responses are stored in the `tecnicos` object with question description as key:
+
+```typescript
+type ResponseValue = "OK" | "NOK" | "NA";
+
+interface TecnicosResponse {
+  [descripcion: string]: ResponseValue;
+}
+```
+
+**Example**:
+```json
+{
+  "Verificar nivel de aceite": "OK",
+  "Inspeccionar fugas de aire": "OK",
+  "Revisar presión de operación": "NOK",
+  "Limpiar filtros": "OK",
+  "Verificar conexiones eléctricas": "NA"
+}
+```
+
+### Handling Question Responses
+
+```javascript
+const handleTecnicoChange = (pregunta, valor) => {
+  setFormData(prev => ({
+    ...prev,
+    tecnicos: {
+      ...prev.tecnicos,
+      [pregunta]: valor
+    }
+  }));
+};
+
+// Usage in radio buttons
+<input
+  type="radio"
+  name={`pregunta-${pregunta.id}`}
+  value="OK"
+  checked={formData.tecnicos[pregunta.descripcion] === "OK"}
+  onChange={() => handleTecnicoChange(pregunta.descripcion, "OK")}
+/>
+```
+
+<Warning>
+Using question description as the key (rather than question ID) can cause issues if descriptions change. Consider using question IDs instead.
+</Warning>
+
+## User Authentication Model
+
+### Login Request
+
+```typescript
+interface LoginRequest {
+  username: string;
+  password: string;
+}
+```
+
+### Login Response
+
+```typescript
+interface LoginResponse {
+  status: "ok" | "error";
+  first_name?: string;  // Present when status is "ok"
+  last_name?: string;   // Present when status is "ok"
+  message?: string;     // Present when status is "error"
+}
+```
+
+**Success Response**:
+```json
+{
+  "status": "ok",
+  "first_name": "Juan",
+  "last_name": "Pérez"
+}
+```
+
+**Error Response**:
+```json
+{
+  "status": "error",
+  "message": "Invalid credentials"
+}
+```
+
+## Submission Data Model
+
+When submitting the form, the complete data structure is sent:
+
+```typescript
+interface InspectionSubmission extends FormData {
+  usuario: string;  // User's full name
+}
+```
+
+**Complete Submission Example**:
+```json
+{
+  "fecha": "2026-03-06",
+  "horaInicio": "09:30:00",
+  "horaFin": "10:15:00",
+  "division": "1",
+  "area": "2",
+  "zona": "1",
+  "equipo": "1",
+  "observaciones": "Equipo operando normalmente. Se detectó ligera vibración en el motor. Se recomienda balanceo.",
+  "tecnicos": {
+    "Verificar nivel de aceite": "OK",
+    "Inspeccionar fugas de aire": "OK",
+    "Revisar presión de operación": "NOK",
+    "Verificar temperatura de operación": "OK",
+    "Limpiar filtros de aire": "OK",
+    "Verificar conexiones eléctricas": "OK",
+    "Revisar sistema de enfriamiento": "NA"
+  },
+  "usuario": "Juan Pérez"
+}
+```
+
+### Submission Preparation
+
+```javascript
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (!apiUrl) return;
+  
+  // Calculate end time
+  const horaFin = new Date().toTimeString().split(" ")[0];
+  
+  // Prepare complete submission data
+  const submissionData = {
+    ...formData,
+    horaFin: horaFin,
+    usuario: usuario
+  };
+  
+  try {
+    const response = await fetch(`${apiUrl}/api/guardar/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(submissionData)
+    });
+    
+    const result = await response.json();
+    // Handle response...
+  } catch (error) {
+    // Handle error...
+  }
+};
+```
+
+## Component State Model
+
+Beyond the form data, the application maintains additional UI state:
+
+```typescript
+interface ApplicationState {
+  // Mounting state
+  mounted: boolean;
+  
+  // API configuration
+  apiUrl: string | null;
+  
+  // Form data
+  formData: FormData;
+  
+  // User information
+  usuario: string;
+  
+  // Catalog data
+  divisiones: Division[];
+  areas: Area[];
+  zonas: Zona[];
+  equipos: Equipo[];
+  
+  // Equipment details
+  categoria: string;
+  ubicacion: string;
+  preguntas: Pregunta[];
+  
+  // UI feedback
+  statusMessage: string;
+}
+```
+
+### Complete State Initialization
+
+```javascript
+function InspectionForm() {
+  // Routing
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  // Mounting
+  const [mounted, setMounted] = useState(false);
+  
+  // API
+  const [apiUrl, setApiUrl] = useState(null);
+  
+  // Form data
+  const [formData, setFormData] = useState({
+    fecha: "",
+    horaInicio: "",
+    horaFin: "",
+    division: "",
+    area: "",
+    zona: "",
+    equipo: "",
+    observaciones: "",
+    tecnicos: {}
+  });
+  
+  // User
+  const [usuario, setUsuario] = useState("");
+  
+  // Catalogs
+  const [divisiones, setDivisiones] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [zonas, setZonas] = useState([]);
+  const [equipos, setEquipos] = useState([]);
+  
+  // Equipment details
+  const [categoria, setCategoria] = useState("");
+  const [ubicacion, setUbicacion] = useState("");
+  const [preguntas, setPreguntas] = useState([]);
+  
+  // UI feedback
+  const [statusMessage, setStatusMessage] = useState("");
+  
+  // ...
+}
+```
+
+## Data Validation
+
+<Warning>
+The current implementation has minimal client-side validation. Consider adding:
+- Required field validation
+- Data type validation
+- Business rule validation (e.g., end time must be after start time)
+- Question response completeness validation
+</Warning>
+
+### Example Validation Implementation
+
+```javascript
+const validateForm = () => {
+  const errors = [];
+  
+  // Check required fields
+  if (!formData.division) errors.push("División es requerida");
+  if (!formData.area) errors.push("Área es requerida");
+  if (!formData.zona) errors.push("Zona es requerida");
+  if (!formData.equipo) errors.push("Equipo es requerido");
+  
+  // Check that all questions are answered
+  const answeredQuestions = Object.keys(formData.tecnicos).length;
+  if (answeredQuestions < preguntas.length) {
+    errors.push(`Faltan ${preguntas.length - answeredQuestions} preguntas por responder`);
+  }
+  
+  return errors;
+};
+```
+
+## Data Flow Diagram
+
+```
+URL Parameter (equipo=123)
+    ↓
+Load Equipment Data
+    ↓
+┌─────────────────────────┐
+│ Equipment Object        │
+│ - division_id           │
+│ - area_id              │
+│ - zona_id              │
+│ - ubicacion            │
+│ - categoria            │
+└─────────────────────────┘
+    ↓
+┌─────────────────────────┐
+│ Populate Form Fields    │
+│ - Set division          │
+│ - Set area              │
+│ - Set zona              │
+│ - Show ubicacion        │
+└─────────────────────────┘
+    ↓
+┌─────────────────────────┐
+│ Load Questions by       │
+│ Category                │
+└─────────────────────────┘
+    ↓
+┌─────────────────────────┐
+│ User Completes Form     │
+│ - Answer all questions  │
+│ - Add observations      │
+└─────────────────────────┘
+    ↓
+┌─────────────────────────┐
+│ Submit Complete Data    │
+│ - All form fields       │
+│ - All question responses│
+│ - User information      │
+└─────────────────────────┘
+```

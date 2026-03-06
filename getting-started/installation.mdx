@@ -1,0 +1,199 @@
+---
+title: Installation
+description: Install and set up the Production Inspection Form application
+---
+
+## System Requirements
+
+Before installing the Production Inspection Form application, ensure your system meets the following requirements:
+
+<Note>
+This application is built with Next.js and designed for static export deployment.
+</Note>
+
+### Required Software
+
+- **Node.js**: Version 18.x or higher
+- **Package Manager**: npm, yarn, or pnpm
+- **Web Server**: Any HTTP server capable of serving static files (nginx, Apache, etc.)
+- **Browser Support**: Modern browsers with JavaScript enabled (Chrome, Firefox, Edge, Safari)
+
+### Backend Requirements
+
+- Access to the inspection API server at `http://10.107.194.110/insp/`
+- LDAP server for user authentication
+- Network connectivity between client browsers and the API server
+
+---
+
+## Installation Steps
+
+<Steps>
+
+### Download the Application
+
+Obtain the Production Inspection Form source code from your repository or distribution package.
+
+### Install Dependencies
+
+Navigate to the project directory and install the required Node.js dependencies:
+
+<CodeGroup>
+```bash npm
+npm install
+```
+
+```bash yarn
+yarn install
+```
+
+```bash pnpm
+pnpm install
+```
+</CodeGroup>
+
+<Note>
+The application uses React 18+ and Next.js App Router architecture.
+</Note>
+
+### Verify Installation
+
+Check that all dependencies are properly installed:
+
+<CodeGroup>
+```bash npm
+npm list --depth=0
+```
+
+```bash yarn
+yarn list --depth=0
+```
+
+```bash pnpm
+pnpm list --depth=0
+```
+</CodeGroup>
+
+</Steps>
+
+---
+
+## Key Dependencies
+
+The application relies on the following core dependencies:
+
+| Package | Purpose |
+|---------|--------|
+| **next** | Next.js framework for React applications |
+| **react** | Core React library for UI components |
+| **react-dom** | React DOM rendering |
+| **styled-jsx** | CSS-in-JS styling solution (included with Next.js) |
+
+---
+
+## Development Environment Setup
+
+### Running the Development Server
+
+Start the Next.js development server for local testing:
+
+<CodeGroup>
+```bash npm
+npm run dev
+```
+
+```bash yarn
+yarn dev
+```
+
+```bash pnpm
+pnpm dev
+```
+</CodeGroup>
+
+The application will be available at `http://localhost:3000`.
+
+<Warning>
+In development mode, ensure you have network access to the API server at `http://10.107.194.110/insp/` for full functionality.
+</Warning>
+
+### Development Features
+
+- **Hot Module Replacement**: Automatic page refresh on code changes
+- **Error Overlay**: Development-time error reporting
+- **Fast Refresh**: Preserves component state during edits
+
+---
+
+## Project Structure
+
+The application follows Next.js App Router conventions:
+
+```
+production-inspection-form/
+├── app/
+│   ├── page.jsx              # Main inspection form
+│   ├── login/
+│   │   └── page.jsx          # Login page
+│   ├── layout.jsx            # Root layout
+│   └── globals.css           # Global styles
+├── public/
+│   ├── logo-goodyear.png     # Company logo
+│   └── favicon.ico           # Site icon
+├── next.config.js            # Next.js configuration
+└── package.json              # Project dependencies
+```
+
+---
+
+## Troubleshooting Installation
+
+### Node Version Issues
+
+If you encounter compatibility issues, verify your Node.js version:
+
+```bash
+node --version
+```
+
+Upgrade to Node.js 18.x or higher if needed.
+
+### Dependency Conflicts
+
+Clear your package manager cache and reinstall:
+
+<CodeGroup>
+```bash npm
+rm -rf node_modules package-lock.json
+npm cache clean --force
+npm install
+```
+
+```bash yarn
+rm -rf node_modules yarn.lock
+yarn cache clean
+yarn install
+```
+
+```bash pnpm
+rm -rf node_modules pnpm-lock.yaml
+pnpm store prune
+pnpm install
+```
+</CodeGroup>
+
+### Network Access Issues
+
+<Warning>
+Ensure your development environment can reach `http://10.107.194.110/insp/` before proceeding. The application requires this API endpoint for authentication and data submission.
+</Warning>
+
+---
+
+## Next Steps
+
+After successful installation:
+
+1. Configure the application settings (see [Configuration](/getting-started/configuration))
+2. Build and deploy the application (see [Deployment](/getting-started/deployment))
+3. Test the login and inspection form functionality

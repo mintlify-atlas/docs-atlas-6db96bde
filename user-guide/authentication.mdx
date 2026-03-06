@@ -1,0 +1,142 @@
+---
+title: 'Authentication'
+description: 'Learn how to log in and manage your session in the Production Inspection Form system'
+---
+
+# Authentication
+
+The Production Inspection Form system uses LDAP authentication to verify user credentials and manage access to the inspection forms.
+
+## Logging In
+
+To access the inspection system, you must first authenticate with your credentials.
+
+<Steps>
+  <Step title="Navigate to the Login Page">
+    Open your web browser and navigate to the inspection system URL. If you attempt to access the main form without being logged in, you'll be automatically redirected to the login page.
+  </Step>
+  
+  <Step title="Enter Your Credentials">
+    The login form contains two required fields:
+    - **Usuario** (Username): Enter your LDAP username
+    - **Contraseña** (Password): Enter your LDAP password
+    
+    <Note>
+      Both fields are required. You cannot submit the form with empty credentials.
+    </Note>
+  </Step>
+  
+  <Step title="Click the Ingresar Button">
+    Once you've entered your credentials, click the **Ingresar** (Login) button to submit the form.
+  </Step>
+  
+  <Step title="Authentication Response">
+    The system will authenticate against the LDAP server at `http://10.107.194.110/insp/`:
+    - **Success**: You'll be redirected to the main inspection form or your previously requested page
+    - **Failure**: An error message will display: "Credenciales inválidas" (Invalid credentials)
+  </Step>
+</Steps>
+
+## Session Management
+
+Once successfully authenticated, the system manages your session using browser localStorage.
+
+### What Gets Stored
+
+After a successful login, the following information is stored locally in your browser:
+
+- **usuario_inspeccion**: Your username/user ID
+- **usuario_nombre**: Your display name
+- **redirect_after_login**: The page you were trying to access before login (if applicable)
+
+<Info>
+  Session data is stored in your browser's localStorage, which means it persists even if you close and reopen your browser tab. However, it's specific to the browser and device you're using.
+</Info>
+
+### Session Validation
+
+Every time you access the inspection form, the system checks for the presence of `usuario_inspeccion` in localStorage:
+
+- If found: You're granted access to the form
+- If not found: You're redirected to the login page
+
+## Logging Out
+
+To end your session and log out of the system:
+
+<Steps>
+  <Step title="Locate the Logout Button">
+    In the top bar of the inspection form, you'll see your username displayed with the text "Usuario: [your name]"
+  </Step>
+  
+  <Step title="Click Cerrar Sesión">
+    Click the **Cerrar Sesión** (Close Session) button located in the top bar.
+  </Step>
+  
+  <Step title="Automatic Cleanup">
+    The system will:
+    - Clear the `usuario_inspeccion` value from localStorage
+    - Redirect you to the login page
+  </Step>
+</Steps>
+
+<Warning>
+  After logging out, any unsaved inspection data will be lost. Make sure to submit your inspection form before logging out.
+</Warning>
+
+## Security Considerations
+
+### LDAP Authentication
+
+The system uses LDAP (Lightweight Directory Access Protocol) authentication, which:
+
+- Validates credentials against your organization's central directory
+- Ensures consistent user management across systems
+- Provides secure authentication without storing passwords locally
+
+### Session Security
+
+While session data is stored in localStorage for convenience:
+
+<Warning>
+  - Never share your login credentials with others
+  - Always log out when using a shared computer
+  - Clear your browser data if you access the system from a public device
+</Warning>
+
+## Troubleshooting
+
+### Invalid Credentials Error
+
+If you see "Credenciales inválidas":
+
+1. Verify you're using the correct username (usuario)
+2. Check your password for typos
+3. Ensure Caps Lock is not enabled
+4. Contact your system administrator if the issue persists
+
+### Connection Errors
+
+If you see "Error al iniciar sesión" (Login error):
+
+1. Check your network connection
+2. Verify the LDAP server is accessible
+3. Try refreshing the page
+4. Contact IT support if the problem continues
+
+### Automatic Redirects
+
+If you're repeatedly redirected to the login page:
+
+1. Check if your browser allows localStorage
+2. Ensure cookies and local data are not being blocked
+3. Try clearing your browser cache and logging in again
+4. Disable browser extensions that might interfere with localStorage
+
+## Next Steps
+
+Once you've successfully logged in, you can proceed to:
+
+- [Fill out the inspection form](/user-guide/inspection-form)
+- [Select equipment for inspection](/user-guide/equipment-selection)
+- [Submit your inspections](/user-guide/submitting-inspections)
